@@ -4,7 +4,7 @@ import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import {
   GithubOutlined,
 } from '@ant-design/icons-vue'
-import { BookText, Users } from 'lucide-vue-next'
+import { BookText, Package, Users } from 'lucide-vue-next'
 
 import { useConfigStore } from '@/stores/config'
 // import { useDatabaseStore } from '@/stores/database'
@@ -28,6 +28,12 @@ const route = useRoute()
 const router = useRouter()
 
 const isNormalUser = computed(() => userStore.userRole === 'user')
+const topHeaderTitle = computed(() => {
+  if (route.path.startsWith('/product-content')) {
+    return '产品文案'
+  }
+  return '社区'
+})
 
 const layoutSettings = reactive({
   showDebug: false,
@@ -61,7 +67,7 @@ const getRemoteConfig = () => {
 
 onMounted(async () => {
   // Regular users default to community
-  if (isNormalUser.value && route.path !== '/community') {
+  if (isNormalUser.value && !route.path.startsWith('/community') && !route.path.startsWith('/product-content')) {
     router.replace('/community')
   }
   // 加载信息配置
@@ -84,6 +90,12 @@ const mainList = computed(() => {
       path: '/community',
       icon: Users,
       activeIcon: Users
+    },
+    {
+      name: '产品文案',
+      path: '/product-content/generate',
+      icon: Package,
+      activeIcon: Package
     }
   ]
 
@@ -106,7 +118,7 @@ provide('settingsModal', {
             <img :src="infoStore.organization.avatar" />
           </router-link>
         </div>
-        <span class="top-header-title">社区</span>
+        <span class="top-header-title">{{ topHeaderTitle }}</span>
       </div>
       <div class="top-header-right">
         <div class="nav-item user-info">

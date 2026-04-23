@@ -15,6 +15,7 @@ export * from './api_key_api' // API Key 管理 API
 // export * from './tool_api' // 工具 API
 export * from './prompt_api'
 export * from './template_api'
+export * from './product_content_api'
 
 // 导出基础工具函数
 export {

@@ -77,6 +77,32 @@ redirect: '/extensions/prompts',
         }
       ]
     },
+    {
+      path: '/product-content',
+      name: 'product-content',
+      component: AppLayout,
+      redirect: '/product-content/generate',
+      children: [
+        {
+          path: 'generate',
+          name: 'ProductContentGenerate',
+          component: () => import('../views/product-content/ProductContentGenerateView.vue'),
+          meta: { keepAlive: false, requiresAuth: true }
+        },
+        {
+          path: 'history',
+          name: 'ProductContentHistory',
+          component: () => import('../views/product-content/ProductContentHistoryView.vue'),
+          meta: { keepAlive: true, requiresAuth: true }
+        },
+        {
+          path: 'subscription',
+          name: 'ProductContentSubscription',
+          component: () => import('../views/product-content/ProductContentSubscriptionView.vue'),
+          meta: { keepAlive: true, requiresAuth: true }
+        }
+      ]
+    },
 {
       path: '/:pathMatch(.*)*',
       name: 'NotFound',
@@ -124,8 +150,11 @@ router.beforeEach(async (to, from, next) => {
     return
   }
 
+  const normalUserAllowedPrefixes = ['/community', '/market', '/product-content']
+  const normalUserAllowed = normalUserAllowedPrefixes.some((prefix) => to.path.startsWith(prefix))
+
   // Regular users default to community
-  if (isLoggedIn && !isAdmin && !['/community', '/market'].includes(to.path)) {
+  if (isLoggedIn && !isAdmin && !normalUserAllowed) {
     next('/community')
     return
   }

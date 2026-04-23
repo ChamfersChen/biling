@@ -9,6 +9,7 @@ from server.routers.prompt_router import prompts
 from server.routers.market_router import market
 from server.routers.community_router import community
 from server.routers.api_key_router import api_keys, open_prompts
+from server.routers.product_content_router import product_content
 
 router = APIRouter()
 
@@ -22,3 +23,4 @@ router.include_router(market)  # /api/market/*
 router.include_router(community)  # /api/community/*
 router.include_router(api_keys)  # /api/system/api-keys/*
 router.include_router(open_prompts)  # /api/open/prompts/*
+router.include_router(product_content)  # /api/product-content/*

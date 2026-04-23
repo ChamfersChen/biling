@@ -10,6 +10,7 @@ from sqlalchemy.orm import declarative_base
 
 from server.utils.singleton import SingletonMeta
 from src.storage.postgres.models_business import Base as BusinessBase
+from src.storage.postgres import models_product_content  # noqa: F401
 from src.utils import logger
 
 # 合并两个 Base
