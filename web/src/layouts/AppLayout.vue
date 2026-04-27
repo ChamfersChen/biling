@@ -178,7 +178,7 @@ provide('settingsModal', {
       <div class="github nav-item">
         <a-tooltip placement="right">
           <template #title>欢迎 Star</template>
-          <a href="https://github.com/ChamfersChen/prompta" target="_blank" class="github-link">
+          <a href="https://github.com/ChamfersChen/biling" target="_blank" class="github-link">
             <GithubOutlined class="icon" />
           </a>
         </a-tooltip>

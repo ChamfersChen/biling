@@ -11,7 +11,7 @@
 1. 克隆代码
 
 ```shell
-git clone https://github.com/ChamfersChen/prompta.git
+git clone https://github.com/ChamfersChen/biling.git
 cd prompta
 ```
 

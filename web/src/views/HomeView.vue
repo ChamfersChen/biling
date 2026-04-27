@@ -41,7 +41,7 @@
         </nav>
 
         <div class="header-actions">
-          <a href="https://github.com/ChamfersChen/prompta" target="_blank" rel="noopener noreferrer" class="github-link">
+          <a href="https://github.com/ChamfersChen/biling" target="_blank" rel="noopener noreferrer" class="github-link">
             <Github :size="16" />
             <span>GitHub</span>
           </a>
