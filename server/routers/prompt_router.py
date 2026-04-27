@@ -73,6 +73,44 @@ def _extract_prompt_variables(content: str) -> list[str]:
     return sorted(found)
 
 
+@prompts.get("/available-for-product-content")
+async def list_prompts_for_product_content(
+    current_user: User = Depends(get_required_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        repo = PromptRepository(db)
+        items = await repo.list_by_user(current_user.username)
+        required_variables = ["product_payload", "channel", "styles_payload", "count"]
+        result = []
+
+        for item in items:
+            if item.is_dir:
+                continue
+            variables = _extract_prompt_variables(item.description or "")
+            missing = [name for name in required_variables if name not in variables]
+            extra = [name for name in variables if name not in required_variables]
+            result.append(
+                {
+                    "external_id": item.external_id,
+                    "name": item.name or item.path,
+                    "path": item.path,
+                    "variables": variables,
+                    "missing_variables": missing,
+                    "extra_variables": extra,
+                    "is_compatible": len(missing) == 0,
+                    "updated_at": item.updated_at.isoformat() if item.updated_at else None,
+                }
+            )
+
+        return {"success": True, "data": {"list": result, "required_variables": required_variables}}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to list product-content available prompts: {e}")
+        raise HTTPException(status_code=500, detail="获取产品文案可用提示词失败")
+
+
 def _build_prompt_test_capability() -> dict:
     model_names = {}
     status_map = getattr(app_config, "model_provider_status", {}) or {}

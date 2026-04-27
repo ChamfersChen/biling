@@ -97,14 +97,26 @@ export async function apiRequest(url, options = {}, requiresAuth = true, respons
           window.location.href = '/login'
         }, 1500)
 
-        throw new Error('未授权，请先登录')
+        const authError = new Error('未授权，请先登录')
+        authError.status = response.status
+        authError.payload = errorData
+        throw authError
       } else if (response.status === 403) {
-        throw new Error('没有权限执行此操作')
+        const forbiddenError = new Error('没有权限执行此操作')
+        forbiddenError.status = response.status
+        forbiddenError.payload = errorData
+        throw forbiddenError
       } else if (response.status === 500) {
-        throw new Error('服务器内部错误，请使用 docker logs api-dev 查看详细日志')
+        const serverError = new Error('服务器内部错误，请使用 docker logs api-dev 查看详细日志')
+        serverError.status = response.status
+        serverError.payload = errorData
+        throw serverError
       }
 
-      throw new Error(errorMessage)
+      const requestError = new Error(errorMessage)
+      requestError.status = response.status
+      requestError.payload = errorData
+      throw requestError
     }
 
     // 根据responseType处理响应

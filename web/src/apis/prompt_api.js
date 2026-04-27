@@ -44,6 +44,10 @@ export const getPromptTestCapability = async () => {
   return apiGet(`${BASE_URL}/test-capability`)
 }
 
+export const getPromptsAvailableForProductContent = async () => {
+  return apiGet(`${BASE_URL}/available-for-product-content`)
+}
+
 export const testPrompt = async (payload) => {
   return apiPost(`${BASE_URL}/test`, payload)
 }
@@ -57,6 +61,7 @@ export const promptApi = {
   deletePromptFile,
   renamePromptNode,
   getPromptTestCapability,
+  getPromptsAvailableForProductContent,
   testPrompt
 }
 

@@ -57,6 +57,8 @@ class ProductContentGeneration(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     department_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True)
+    prompt_external_id = Column(String(36), nullable=True, index=True)
+    prompt_name = Column(String(128), nullable=True)
     channel = Column(String(32), nullable=False, default="xiaohongshu")
     tone_styles = Column(JSONB, nullable=False)
     result_items = Column(JSONB, nullable=False)
@@ -71,6 +73,8 @@ class ProductContentGeneration(Base):
             "user_id": self.user_id,
             "department_id": self.department_id,
             "product_id": self.product_id,
+            "prompt_external_id": self.prompt_external_id,
+            "prompt_name": self.prompt_name,
             "channel": self.channel,
             "tone_styles": self.tone_styles or [],
             "result_items": self.result_items or [],

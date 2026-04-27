@@ -177,6 +177,21 @@ class PostgresManager(metaclass=SingletonMeta):
             await conn.execute(
                 text("CREATE UNIQUE INDEX IF NOT EXISTS ix_prompts_external_id ON prompts (external_id)")
             )
+            await conn.execute(
+                text(
+                    "ALTER TABLE product_content_generations ADD COLUMN IF NOT EXISTS prompt_external_id VARCHAR(36)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE product_content_generations ADD COLUMN IF NOT EXISTS prompt_name VARCHAR(128)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_product_content_generations_prompt_external_id ON product_content_generations (prompt_external_id)"
+                )
+            )
 
     async def drop_tables(self):
         """删除所有表（慎用！）"""

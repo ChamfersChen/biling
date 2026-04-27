@@ -28,10 +28,28 @@ class ProductPayload(BaseModel):
 
 
 class GenerateContentRequest(BaseModel):
+    product_id: int | None = Field(default=None)
+    prompt_external_id: str | None = Field(default=None)
     product: ProductPayload
     count: int = Field(10, ge=1, le=20)
     styles: list[str] = Field(default_factory=list)
     channel: str = Field("xiaohongshu")
+
+
+@product_content.get("/prompt-options")
+async def list_prompt_options(
+    current_user: User = Depends(get_required_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        service = ProductContentService(db)
+        items = await service.list_available_prompts(user=current_user)
+        return {"success": True, "data": {"list": items, "required_variables": ["product_payload", "channel", "styles_payload", "count"]}}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"list prompt options failed: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="获取提示词选项失败")
 
 
 class GenerateImageRequest(BaseModel):
@@ -134,6 +152,23 @@ async def list_generations(
     except Exception as e:
         logger.error(f"list generations failed: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="获取生成记录失败")
+
+
+@product_content.get("/products/{product_id}/latest-generation")
+async def get_latest_generation_for_product(
+    product_id: int,
+    current_user: User = Depends(get_required_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        service = ProductContentService(db)
+        item = await service.get_latest_generation_for_product(user=current_user, product_id=product_id)
+        return {"success": True, "data": item}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"get latest generation for product failed: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="获取产品最近生成结果失败")
 
 
 @product_content.post("/generate")

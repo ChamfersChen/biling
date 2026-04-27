@@ -15,6 +15,33 @@ const defaultProductForm = {
   attributes: {}
 }
 
+const normalizeGeneration = (data) => {
+  if (!data) {
+    return null
+  }
+  const items = data.items || data.result_items || []
+  return {
+    ...data,
+    items,
+    result_items: items,
+    tone_styles: data.tone_styles || [],
+    channel: data.channel || 'xiaohongshu',
+    created_at: data.created_at || null,
+    product_name: data.product_name || null,
+    product_category: data.product_category || null,
+    prompt_name: data.prompt_name || null,
+    prompt_external_id: data.prompt_external_id || null
+  }
+}
+
+const upsertProduct = (list, product) => {
+  if (!product?.id) {
+    return list
+  }
+  const next = [product, ...list.filter((item) => item.id !== product.id)]
+  return next
+}
+
 export const useProductContentStore = defineStore('productContent', () => {
   const products = ref([])
   const productsTotal = ref(0)
@@ -23,11 +50,13 @@ export const useProductContentStore = defineStore('productContent', () => {
   const currentQuota = ref(null)
   const subscription = ref(null)
   const lastGenerated = ref(null)
+  const promptOptions = ref([])
 
   const loadingProducts = ref(false)
   const loadingGenerations = ref(false)
   const loadingQuota = ref(false)
   const loadingSubscription = ref(false)
+  const loadingPromptOptions = ref(false)
   const isGenerating = ref(false)
   const isGeneratingImage = ref(false)
 
@@ -53,12 +82,28 @@ export const useProductContentStore = defineStore('productContent', () => {
     }
   }
 
+  async function fetchPromptOptions() {
+    loadingPromptOptions.value = true
+    try {
+      const data = await productContentApi.getPromptOptions()
+      promptOptions.value = data.list || []
+      return data
+    } finally {
+      loadingPromptOptions.value = false
+    }
+  }
+
   async function createProduct(payload) {
-    return productContentApi.createProduct(payload)
+    const data = await productContentApi.createProduct(payload)
+    products.value = upsertProduct(products.value, data)
+    productsTotal.value = Math.max(productsTotal.value, products.value.length)
+    return data
   }
 
   async function updateProduct(productId, payload) {
-    return productContentApi.updateProduct(productId, payload)
+    const data = await productContentApi.updateProduct(productId, payload)
+    products.value = products.value.map((item) => (item.id === productId ? data : item))
+    return data
   }
 
   async function deleteProduct(productId) {
@@ -71,12 +116,19 @@ export const useProductContentStore = defineStore('productContent', () => {
     loadingGenerations.value = true
     try {
       const data = await productContentApi.getGenerations(params)
-      generations.value = data.list || []
+      generations.value = (data.list || []).map(normalizeGeneration)
       generationsTotal.value = data.total || 0
       return data
     } finally {
       loadingGenerations.value = false
     }
+  }
+
+  async function fetchLatestGenerationForProduct(productId) {
+    const data = await productContentApi.getLatestGenerationForProduct(productId)
+    const normalized = normalizeGeneration(data)
+    lastGenerated.value = normalized
+    return normalized
   }
 
   async function fetchQuota() {
@@ -105,11 +157,35 @@ export const useProductContentStore = defineStore('productContent', () => {
     isGenerating.value = true
     try {
       const data = await productContentApi.generateContents(payload)
-      lastGenerated.value = data
-      if (data?.quota) {
-        currentQuota.value = data.quota
+      const normalized = normalizeGeneration(data)
+      lastGenerated.value = normalized
+      if (normalized?.product_id) {
+        const index = products.value.findIndex((item) => item.id === normalized.product_id)
+        if (index !== -1) {
+          products.value[index] = {
+            ...products.value[index],
+            ...(payload.product || {}),
+            id: normalized.product_id,
+            name: normalized.product_name || payload.product?.name || products.value[index].name,
+            category: normalized.product_category || payload.product?.category || products.value[index].category,
+            updated_at: normalized.created_at || products.value[index].updated_at
+          }
+        } else if (payload.product) {
+          products.value = upsertProduct(products.value, {
+            ...payload.product,
+            id: normalized.product_id,
+            name: normalized.product_name || payload.product.name,
+            category: normalized.product_category || payload.product.category || 'general',
+            updated_at: normalized.created_at,
+            created_at: normalized.created_at
+          })
+          productsTotal.value = Math.max(productsTotal.value, products.value.length)
+        }
       }
-      return data
+      if (normalized?.quota) {
+        currentQuota.value = normalized.quota
+      }
+      return normalized
     } finally {
       isGenerating.value = false
     }
@@ -144,18 +220,22 @@ export const useProductContentStore = defineStore('productContent', () => {
     currentQuota,
     subscription,
     lastGenerated,
+    promptOptions,
     loadingProducts,
     loadingGenerations,
     loadingQuota,
     loadingSubscription,
+    loadingPromptOptions,
     isGenerating,
     isGeneratingImage,
     hasQuota,
     fetchProducts,
+    fetchPromptOptions,
     createProduct,
     updateProduct,
     deleteProduct,
     fetchGenerations,
+    fetchLatestGenerationForProduct,
     fetchQuota,
     fetchSubscription,
     generateContents,

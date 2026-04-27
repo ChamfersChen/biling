@@ -65,19 +65,6 @@ redirect: '/extensions/prompts',
       ]
     },
     {
-      path: '/market',
-      name: 'market',
-      component: AppLayout,
-      children: [
-        {
-          path: '',
-          name: 'TemplateMarket',
-          component: () => import('../views/TemplateMarketView.vue'),
-          meta: { keepAlive: true, requiresAuth: false }
-        }
-      ]
-    },
-    {
       path: '/product-content',
       name: 'product-content',
       component: AppLayout,
@@ -150,7 +137,7 @@ router.beforeEach(async (to, from, next) => {
     return
   }
 
-  const normalUserAllowedPrefixes = ['/community', '/market', '/product-content']
+  const normalUserAllowedPrefixes = ['/community', '/product-content']
   const normalUserAllowed = normalUserAllowedPrefixes.some((prefix) => to.path.startsWith(prefix))
 
   // Regular users default to community

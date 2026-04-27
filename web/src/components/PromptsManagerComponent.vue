@@ -67,8 +67,9 @@
                       <span class="tree-node-title" :title="node.title">{{ node.title }}</span>
                       <template #overlay>
                         <a-menu @click="({ key }) => handleTreeContextAction(key, node)">
-                          <a-menu-item key="new-file">新建文件</a-menu-item>
-                          <a-menu-item key="new-dir">新建目录</a-menu-item>
+                        <a-menu-item key="new-file">新建文件</a-menu-item>
+                        <a-menu-item key="new-product-content-template">新建产品文案模板</a-menu-item>
+                        <a-menu-item key="new-dir">新建目录</a-menu-item>
                           <a-menu-divider />
                           <a-menu-item key="rename">重命名</a-menu-item>
                           <a-menu-item key="delete" danger>删除</a-menu-item>
@@ -108,6 +109,8 @@
                   <div v-if="selectedExternalId && !selectedIsDir" class="external-id-inline">
                     <span class="external-id-label">External ID</span>
                     <code class="external-id-value" :title="selectedExternalId">{{ selectedExternalId }}</code>
+                    <a-tag v-if="productContentPromptStatus?.is_compatible" color="green">可用于产品文案</a-tag>
+                    <a-tag v-else-if="productContentPromptStatus" color="orange">缺少变量</a-tag>
                     <button
                       type="button"
                       class="external-id-copy-btn"
@@ -430,11 +433,11 @@
       </a-form>
     </a-modal>
 
-    <!-- 发布到市场弹窗 -->
+    <!-- 发布到社区弹窗 -->
     <a-modal
       v-model:open="publishModalVisible"
       title="发布到提示词社区"
-      @ok="handlePublishToMarket"
+      @ok="handlePublishToCommunity"
       :confirm-loading="publishing"
       width="520px"
       class="publish-modal"
@@ -532,6 +535,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { MdPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/preview.css'
@@ -559,14 +563,21 @@ import {
   Store
 } from 'lucide-vue-next'
 import { promptApi } from '@/apis/prompt_api'
-import { publishTemplate, updateTemplate, getMyTemplates, unpublishTemplate, deleteTemplate } from '@/apis/template_api'
-import { publishPrompt as communityPublishPrompt, getMyTemplates as communityGetMyTemplates, unpublishTemplate as communityUnpublish, updateTemplate as communityUpdateTemplate } from '@/apis/community_api'
+import {
+  publishPrompt as communityPublishPrompt,
+  getMyTemplates as communityGetMyTemplates,
+  unpublishTemplate as communityUnpublish,
+  updateTemplate as communityUpdateTemplate,
+  deleteTemplate as communityDeleteTemplate
+} from '@/apis/community_api'
 import { useUserStore } from '@/stores/user'
 import FileTreeComponent from '@/components/FileTreeComponent.vue'
 
 const themeStore = useThemeStore()
 const userStore = useUserStore()
 const configStore = useConfigStore()
+const route = useRoute()
+const router = useRouter()
 const theme = computed(() => (themeStore.isDark ? 'dark' : 'light'))
 
 const previewContent = computed(() => {
@@ -647,6 +658,24 @@ const promptTestCapability = reactive({
   availableModels: []
 })
 const promptTestForm = reactive({ model_spec: '' })
+const productContentPromptMap = ref({})
+
+const PRODUCT_CONTENT_TEMPLATE_FILE_NAME = 'product-content-template.md'
+const PRODUCT_CONTENT_TEMPLATE_CONTENT = `You are a top-tier product marketing copywriter. Generate high-quality social media copy in Simplified Chinese.
+
+Product data: {{product_payload}}
+Channel: {{channel}}
+Styles to cover: {{styles_payload}}
+Item count: {{count}}
+
+Requirements:
+1) Return ONLY valid JSON (no markdown code fences).
+2) JSON must be an array with exactly the requested item count.
+3) Each item must include keys: style, title, content, hashtags, image_prompt.
+4) hashtags must be an array of strings, each beginning with '#'.
+5) content should be around 150-300 Chinese characters, avoid policy-violating claims.
+6) Make each item distinct in opening sentence and tone.
+`
 
 const promptTestModelOptions = computed(() =>
   (promptTestCapability.availableModels || []).map((spec) => ({
@@ -654,6 +683,13 @@ const promptTestModelOptions = computed(() =>
     value: spec
   }))
 )
+
+const productContentPromptStatus = computed(() => {
+  if (!selectedExternalId.value || selectedIsDir.value) {
+    return null
+  }
+  return productContentPromptMap.value[selectedExternalId.value] || null
+})
 
 const templateCategories = [
   { key: 'writing', name: '写作' },
@@ -965,6 +1001,23 @@ const findNodeByPath = (nodes, path) => {
   return null
 }
 
+const findPathByExternalId = (nodes, externalId) => {
+  const target = String(externalId || '').trim()
+  if (!target) return ''
+
+  for (const node of nodes || []) {
+    if (!node.is_dir && node.external_id === target) {
+      return node.path || node.key || ''
+    }
+    if (node.children?.length) {
+      const found = findPathByExternalId(node.children, target)
+      if (found) return found
+    }
+  }
+
+  return ''
+}
+
 const getAncestorKeys = (path) => {
   const parts = String(path || '').split('/').filter(Boolean)
   const result = []
@@ -1007,6 +1060,25 @@ const reloadTree = async () => {
   }
 }
 
+const syncSelectionFromRoute = async () => {
+  const externalId = String(route.query.external_id || '').trim()
+  if (!externalId || !treeData.value.length) {
+    return
+  }
+
+  const targetPath = findPathByExternalId(treeData.value, externalId)
+  if (!targetPath) {
+    message.warning(`未找到 external_id 为 ${externalId} 的提示词`)
+    return
+  }
+
+  if (selectedPath.value === targetPath && selectedExternalId.value === externalId) {
+    return
+  }
+
+  await openPath(targetPath)
+}
+
 const loadPromptTestCapability = async () => {
   try {
     const result = await promptApi.getPromptTestCapability()
@@ -1033,6 +1105,19 @@ const loadPromptTestCapability = async () => {
     promptTestCapability.defaultReady = false
     promptTestCapability.defaultIssues = []
     promptTestCapability.availableModels = []
+  }
+}
+
+const loadProductContentPromptStatus = async () => {
+  try {
+    const result = await promptApi.getPromptsAvailableForProductContent()
+    const list = result?.data?.list || []
+    productContentPromptMap.value = list.reduce((acc, item) => {
+      acc[item.external_id] = item
+      return acc
+    }, {})
+  } catch {
+    productContentPromptMap.value = {}
   }
 }
 
@@ -1463,6 +1548,12 @@ const openCreateModal = (isDir, targetNode = null) => {
   createModalVisible.value = true
 }
 
+const openProductContentTemplateModal = (targetNode = null) => {
+  openCreateModal(false, targetNode)
+  createFileName.value = PRODUCT_CONTENT_TEMPLATE_FILE_NAME
+  createForm.content = PRODUCT_CONTENT_TEMPLATE_CONTENT
+}
+
 const openRenameModal = (targetNode = null) => {
   const path = targetNode?.path || selectedPath.value
   if (!path) return
@@ -1607,7 +1698,7 @@ const confirmDeleteNode = (targetNode = null) => {
     onOk: async () => {
       try {
         for (const template of publishedTemplates) {
-          await deleteTemplate(template.id)
+          await communityDeleteTemplate(template.id)
         }
         await promptApi.deletePromptFile(targetPath)
         if (selectedPath.value === targetPath || selectedPath.value.startsWith(`${targetPath}/`)) {
@@ -1626,6 +1717,10 @@ const confirmDeleteNode = (targetNode = null) => {
 const handleTreeContextAction = (key, node) => {
   if (key === 'new-file') {
     openCreateModal(false, node)
+    return
+  }
+  if (key === 'new-product-content-template') {
+    openProductContentTemplateModal(node)
     return
   }
   if (key === 'new-dir') {
@@ -1687,7 +1782,7 @@ const handleUnpublish = async () => {
   }
 }
 
-const handlePublishToMarket = async () => {
+const handlePublishToCommunity = async () => {
   if (!publishForm.name || !fileContent.value) {
     message.error('请填写模板名称')
     return
@@ -1755,6 +1850,33 @@ onMounted(async () => {
   await reloadTree()
   await loadMyTemplates()
   await loadPromptTestCapability()
+  await loadProductContentPromptStatus()
+  await syncSelectionFromRoute()
+})
+
+watch(
+  () => route.query.external_id,
+  async (nextExternalId) => {
+    if (!String(nextExternalId || '').trim()) {
+      return
+    }
+    if (!treeData.value.length) {
+      return
+    }
+    await syncSelectionFromRoute()
+  }
+)
+
+watch(selectedExternalId, (nextExternalId) => {
+  const currentQuery = String(route.query.external_id || '').trim()
+  const currentSelected = String(nextExternalId || '').trim()
+  if (!currentQuery || !currentSelected || currentQuery !== currentSelected) {
+    return
+  }
+
+  const nextQuery = { ...route.query }
+  delete nextQuery.external_id
+  router.replace({ query: nextQuery })
 })
 
 // 暴露方法给父组件
@@ -1766,6 +1888,17 @@ defineExpose({
 
 <style scoped lang="less">
 @import '@/assets/css/extensions.less';
+
+.extension-page-root {
+  --pm-panel: rgba(255, 255, 255, 0.48);
+  --pm-soft-panel: rgba(255, 255, 255, 0.28);
+  --pm-border: rgba(15, 23, 42, 0.08);
+  --pm-shadow: 0 24px 52px rgba(27, 52, 92, 0.12);
+  --pm-text: #172033;
+  --pm-muted: #60708a;
+  --pm-accent: #d97706;
+  --pm-blue: #2563eb;
+}
 
 .list-item {
   .item-details {
@@ -1799,9 +1932,10 @@ defineExpose({
 .main-panel {
   .panel-top-bar {
     &.compact-bar {
-      padding: 6px 12px 4px;
+      padding: 18px 20px 12px;
       gap: 12px;
       align-items: center;
+      border-bottom: 1px solid var(--pm-border);
 
       .panel-title {
         min-width: 0;
@@ -1813,13 +1947,13 @@ defineExpose({
           margin: 0;
           font-size: 15px;
           font-weight: 600;
-          color: var(--gray-800);
+          color: var(--pm-text);
           white-space: nowrap;
         }
 
         .panel-subtitle {
           font-size: 12px;
-          color: var(--gray-500);
+          color: var(--pm-muted);
           white-space: nowrap;
         }
       }
@@ -1837,17 +1971,17 @@ defineExpose({
           height: 22px;
           padding: 0 8px;
           border-radius: 999px;
-          border: 1px solid var(--gray-200);
-          background: var(--gray-50);
-          color: var(--gray-600);
+          border: 1px solid rgba(37, 99, 235, 0.14);
+          background: rgba(255, 255, 255, 0.68);
+          color: var(--pm-muted);
           font-size: 11px;
           display: inline-flex;
           align-items: center;
           line-height: 1;
 
           &.warning {
-            border-color: #fbbf24;
-            background: #fffbeb;
+            border-color: rgba(217, 119, 6, 0.26);
+            background: rgba(255, 247, 237, 0.88);
             color: #b45309;
           }
         }
@@ -1889,7 +2023,7 @@ defineExpose({
 .variable-panel {
   width: 250px;
   border-right: 1px solid @border-color;
-  background: linear-gradient(180deg, #f8fbff 0%, #f4f8ff 100%);
+  background: var(--pm-soft-panel);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -1900,7 +2034,7 @@ defineExpose({
     justify-content: space-between;
     align-items: center;
     border-bottom: 1px solid @border-color;
-    background-color: rgba(255, 255, 255, 0.85);
+    background-color: rgba(255, 255, 255, 0.42);
 
     .variable-header-main {
       min-width: 0;
@@ -1916,12 +2050,13 @@ defineExpose({
       font-size: 12px;
       font-weight: 600;
       color: var(--gray-700);
+      color: var(--pm-text);
       line-height: 1;
     }
 
     .variable-meta {
       font-size: 11px;
-      color: var(--gray-500);
+      color: var(--pm-muted);
       white-space: nowrap;
     }
 
@@ -1934,9 +2069,9 @@ defineExpose({
         width: 24px;
         height: 24px;
         border: 1px solid var(--gray-200);
-        border-radius: 8px;
-        background: var(--gray-0);
-        color: var(--gray-500);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.82);
+        color: var(--pm-muted);
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -1945,9 +2080,9 @@ defineExpose({
         transition: all 0.2s ease;
 
         &:hover:not(:disabled) {
-          color: var(--main-700);
-          border-color: var(--main-300);
-          background: var(--main-50);
+          color: var(--pm-blue);
+          border-color: rgba(37, 99, 235, 0.22);
+          background: rgba(37, 99, 235, 0.08);
         }
 
         &:disabled {
@@ -1966,14 +2101,14 @@ defineExpose({
     padding: 8px;
   }
 
-  .variable-tip {
+    .variable-tip {
     display: flex;
     margin-bottom: 12px;
     padding: 8px;
     border-radius: 10px;
-    background: linear-gradient(180deg, #f8fbff 0%, #f5f8ff 100%);
-    border: 1px solid #dbe7fb;
-    color: var(--gray-500);
+    background: rgba(255, 255, 255, 0.44);
+    border: 1px solid rgba(37, 99, 235, 0.14);
+    color: var(--pm-muted);
     font-size: 12px;
     line-height: 1.5;
 
@@ -1983,8 +2118,8 @@ defineExpose({
       font-family: 'Fira Code', 'Monaco', monospace;
       padding: 1px 5px;
       border-radius: 6px;
-      background: rgba(59, 130, 246, 0.08);
-      border: 1px solid rgba(59, 130, 246, 0.18);
+      background: rgba(37, 99, 235, 0.08);
+      border: 1px solid rgba(37, 99, 235, 0.18);
       color: #2558a9;
     }
   }
@@ -2008,19 +2143,19 @@ defineExpose({
   }
 
   .variable-item {
-    background-color: var(--gray-0);
+    background-color: rgba(255, 255, 255, 0.48);
     border: 1px solid @border-color;
-    border-radius: 10px;
+    border-radius: 16px;
     padding: 9px;
     display: flex;
     flex-direction: column;
     gap: 7px;
-    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 
     &:hover {
-      border-color: var(--main-200);
-      box-shadow: 0 8px 22px rgba(59, 130, 246, 0.08);
+      border-color: rgba(37, 99, 235, 0.18);
+      box-shadow: 0 14px 28px rgba(37, 99, 235, 0.08);
     }
 
     .variable-info {
@@ -2031,7 +2166,7 @@ defineExpose({
         .variable-name {
           font-size: 12px;
           font-weight: 600;
-          color: var(--gray-700);
+          color: var(--pm-text);
           font-family: monospace;
           max-width: 130px;
           overflow: hidden;
@@ -2048,14 +2183,14 @@ defineExpose({
           border: none;
           padding: 2px;
           cursor: pointer;
-          color: var(--gray-500);
+          color: var(--pm-muted);
           display: flex;
           align-items: center;
           border-radius: 2px;
 
           &:hover {
-            color: var(--gray-700);
-            background-color: #eef3ff;
+            color: var(--pm-blue);
+            background-color: rgba(37, 99, 235, 0.08);
           }
 
           &.delete:hover {
@@ -2077,9 +2212,9 @@ defineExpose({
   .prompt-test-card {
     margin-top: 10px;
     padding: 10px;
-    border: 1px solid #d8e6f8;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(37, 99, 235, 0.14);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.44);
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -2095,9 +2230,9 @@ defineExpose({
       font-size: 11px;
       padding: 1px 7px;
       border-radius: 999px;
-      border: 1px solid #cfd8e3;
-      color: var(--gray-500);
-      background: #f7f9fc;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        color: var(--pm-muted);
+        background: rgba(248, 250, 252, 0.9);
 
       &.ready {
         border-color: #bfe7cf;
@@ -2120,26 +2255,24 @@ defineExpose({
 
     .prompt-test-btn {
       min-width: 92px;
-      border-radius: 8px;
-      border-color: var(--color-primary-500);
-      background: var(--color-primary-500);
-      color: var(--gray-0);
-      box-shadow: none;
+      border-radius: 999px;
+      border: none;
+      background: linear-gradient(135deg, #d97706, #2563eb);
+      color: #fff;
+      box-shadow: 0 14px 24px rgba(37, 99, 235, 0.16);
       font-weight: 500;
       transition: all 0.2s ease;
 
-      &:hover,
-      &:focus {
-        border-color: var(--color-primary-700);
-        background: var(--color-primary-700);
-        color: var(--gray-0);
-      }
+        &:hover,
+        &:focus {
+          background: linear-gradient(135deg, #c26a05, #1f56c9);
+          color: #fff;
+        }
 
-      &:active {
-        border-color: var(--color-primary-900);
-        background: var(--color-primary-900);
-        color: var(--gray-0);
-      }
+        &:active {
+          background: linear-gradient(135deg, #a95c05, #1b4cac);
+          color: #fff;
+        }
 
       &[disabled],
       &[disabled]:hover {
@@ -2156,7 +2289,7 @@ defineExpose({
 .tree-container {
   width: 280px;
   border-right: 1px solid @border-color;
-  background: linear-gradient(180deg, #f8fafc 0%, #f5f7fb 100%);
+  background: var(--pm-soft-panel);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -2167,7 +2300,7 @@ defineExpose({
     justify-content: space-between;
     align-items: flex-start;
     border-bottom: 1px solid @border-color;
-    background-color: rgba(255, 255, 255, 0.72);
+    background-color: rgba(255, 255, 255, 0.7);
 
     .tree-title-wrap {
       display: flex;
@@ -2180,18 +2313,18 @@ defineExpose({
       display: flex;
       align-items: center;
       gap: 6px;
-      color: var(--main-800);
+      color: var(--pm-blue);
     }
 
     .label {
       font-size: 13px;
       font-weight: 700;
-      color: var(--gray-800);
+      color: var(--pm-text);
     }
 
     .tree-meta {
       font-size: 11px;
-      color: var(--gray-500);
+      color: var(--pm-muted);
     }
 
     .tree-actions {
@@ -2199,24 +2332,46 @@ defineExpose({
       gap: 6px;
       padding-top: 1px;
 
+      .product-template-entry-btn {
+        height: 26px;
+        border-radius: 999px;
+        border: 1px solid rgba(37, 99, 235, 0.18);
+        background: rgba(255, 255, 255, 0.56);
+        color: var(--pm-blue);
+        font-size: 12px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 10px;
+        box-shadow: none;
+
+        &:hover,
+        &:focus {
+          color: #1d4ed8;
+          border-color: rgba(37, 99, 235, 0.32);
+          background: rgba(37, 99, 235, 0.08);
+        }
+      }
+
       .tree-action-btn {
         width: 26px;
         height: 26px;
         border: 1px solid var(--gray-200);
-        background: var(--gray-0);
-        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.46);
+        border-radius: 10px;
         padding: 0;
         cursor: pointer;
-        color: var(--gray-500);
+        color: var(--pm-muted);
         display: flex;
         align-items: center;
         justify-content: center;
         transition: all 0.2s ease;
 
         &:hover {
-          color: var(--main-800);
-          border-color: var(--main-300);
-          background: var(--main-50);
+          color: var(--pm-blue);
+          border-color: rgba(37, 99, 235, 0.22);
+          background: rgba(37, 99, 235, 0.08);
         }
       }
     }
@@ -2227,18 +2382,18 @@ defineExpose({
 
     :deep(.ant-input-affix-wrapper) {
       border-radius: 9px;
-      border-color: var(--gray-200);
-      background: var(--gray-0);
+      border-color: rgba(15, 23, 42, 0.08);
+      background: rgba(255, 255, 255, 0.54);
       box-shadow: none;
 
       &:focus,
       &-focused {
-        border-color: var(--main-300);
+        border-color: rgba(37, 99, 235, 0.3);
       }
     }
 
     :deep(.ant-input-prefix) {
-      color: var(--gray-400);
+      color: var(--pm-muted);
       margin-right: 6px;
       display: flex;
       align-items: center;
@@ -2249,18 +2404,49 @@ defineExpose({
     flex: 1;
     overflow-y: auto;
     padding: 10px;
+    position: relative;
 
     .tree-surface {
-      background: var(--gray-0);
-      border: 1px solid var(--gray-200);
-      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.46);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 20px;
       padding: 8px 6px;
       min-height: 100%;
-      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
     }
 
     .tree-empty {
       padding: 22px 0 10px;
+    }
+
+    .tree-surface-context-menu {
+      position: fixed;
+      z-index: 1200;
+      min-width: 180px;
+      padding: 6px;
+      border-radius: 14px;
+      border: 1px solid rgba(37, 99, 235, 0.16);
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 18px 40px rgba(27, 52, 92, 0.18);
+      backdrop-filter: blur(14px);
+
+      button {
+        width: 100%;
+        border: none;
+        background: transparent;
+        border-radius: 10px;
+        min-height: 34px;
+        padding: 0 10px;
+        text-align: left;
+        color: var(--pm-text);
+        font-size: 13px;
+        cursor: pointer;
+
+        &:hover {
+          background: rgba(37, 99, 235, 0.08);
+          color: var(--pm-blue);
+        }
+      }
     }
   }
 }
@@ -2274,12 +2460,12 @@ defineExpose({
   min-height: 0;
 
   .editor-header {
-    padding: 8px 12px;
+    padding: 14px 18px;
     border-bottom: 1px solid @border-color;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    background-color: var(--gray-0);
+    background-color: rgba(255, 255, 255, 0.32);
     flex-shrink: 0;
 
     .header-main {
@@ -2296,6 +2482,7 @@ defineExpose({
       font-family: monospace;
       font-size: 12px;
       color: var(--gray-500);
+      color: var(--pm-muted);
       min-width: 0;
       width: 100%;
       overflow: hidden;
@@ -2330,11 +2517,11 @@ defineExpose({
         }
 
         &:hover {
-          color: var(--main-700);
+          color: var(--pm-blue);
         }
 
         &.active {
-          color: var(--gray-700);
+          color: var(--pm-text);
           font-weight: 600;
         }
 
@@ -2364,15 +2551,15 @@ defineExpose({
       gap: 6px;
       max-width: min(44vw, 460px);
       margin-right: auto;
-      border: 1px solid #dbe8f8;
-      background: linear-gradient(90deg, #f8fbff 0%, #f4f8ff 100%);
-      border-radius: 999px;
+       border: 1px solid rgba(37, 99, 235, 0.14);
+       background: rgba(255, 255, 255, 0.4);
+       border-radius: 999px;
       padding: 0 6px;
       height: 24px;
 
       .external-id-label {
         font-size: 10px;
-        color: #4f6f93;
+        color: var(--pm-muted);
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.04em;
@@ -2388,7 +2575,7 @@ defineExpose({
         font-family: 'Fira Code', 'Monaco', monospace;
         font-size: 11px;
         color: #1f4e7b;
-        background: rgba(255, 255, 255, 0.7);
+        background: rgba(255, 255, 255, 0.52);
         border-radius: 999px;
         padding: 1px 7px;
       }
@@ -2396,7 +2583,7 @@ defineExpose({
       .external-id-copy-btn {
         border: none;
         background: transparent;
-        color: #2c5d8f;
+        color: var(--pm-blue);
         width: 20px;
         height: 20px;
         border-radius: 999px;
@@ -2408,10 +2595,18 @@ defineExpose({
         flex-shrink: 0;
 
         &:hover {
-          background: rgba(59, 130, 246, 0.1);
+          background: rgba(37, 99, 235, 0.1);
           color: #174978;
         }
       }
+    }
+
+    .product-content-prompt-hint {
+      margin-right: auto;
+      color: var(--pm-muted);
+      font-size: 12px;
+      line-height: 1.5;
+      max-width: min(46vw, 520px);
     }
 
     .header-actions {
@@ -2428,7 +2623,7 @@ defineExpose({
 
       :deep(.toolbar-btn) {
         height: 28px;
-        border-radius: 8px;
+        border-radius: 999px;
         font-size: 12px;
         font-weight: 500;
         border-width: 1px;
@@ -2440,41 +2635,40 @@ defineExpose({
       }
 
       :deep(.toolbar-btn.toolbar-btn-secondary) {
-        background: var(--main-0);
-        border-color: var(--color-primary-100);
-        color: var(--color-primary-700);
+        background: rgba(255, 255, 255, 0.42);
+        border-color: rgba(37, 99, 235, 0.18);
+        color: var(--pm-blue);
       }
 
       :deep(.toolbar-btn.toolbar-btn-secondary:hover),
       :deep(.toolbar-btn.toolbar-btn-secondary:focus) {
-        background: var(--color-primary-50);
-        border-color: var(--color-primary-500);
-        color: var(--color-primary-700);
+        background: rgba(37, 99, 235, 0.1);
+        border-color: rgba(37, 99, 235, 0.32);
+        color: #1d4ed8;
       }
 
       :deep(.toolbar-btn.toolbar-btn-secondary:active) {
-        background: var(--color-primary-100);
-        border-color: var(--color-primary-700);
-        color: var(--color-primary-900);
+        background: rgba(37, 99, 235, 0.14);
+        border-color: rgba(37, 99, 235, 0.42);
+        color: #1e40af;
       }
 
       :deep(.toolbar-btn.toolbar-btn-primary) {
-        background: var(--color-primary-500);
-        border-color: var(--color-primary-500);
-        color: var(--gray-0);
+        background: linear-gradient(135deg, #d97706, #2563eb);
+        border: none;
+        color: #fff;
+        box-shadow: 0 14px 24px rgba(37, 99, 235, 0.16);
       }
 
       :deep(.toolbar-btn.toolbar-btn-primary:hover),
       :deep(.toolbar-btn.toolbar-btn-primary:focus) {
-        background: var(--color-primary-700);
-        border-color: var(--color-primary-700);
-        color: var(--gray-0);
+        background: linear-gradient(135deg, #c26a05, #1f56c9);
+        color: #fff;
       }
 
       :deep(.toolbar-btn.toolbar-btn-primary:active) {
-        background: var(--color-primary-900);
-        border-color: var(--color-primary-900);
-        color: var(--gray-0);
+        background: linear-gradient(135deg, #a95c05, #1b4cac);
+        color: #fff;
       }
 
       :deep(.toolbar-btn.ant-btn[disabled]),
@@ -2521,9 +2715,9 @@ defineExpose({
     }
 
     .recent-item {
-      border: 1px solid var(--gray-200);
-      background: #f8fafc;
-      color: var(--gray-600);
+      border: 1px solid rgba(37, 99, 235, 0.12);
+      background: rgba(255, 255, 255, 0.78);
+      color: var(--pm-muted);
       border-radius: 999px;
       height: 24px;
       padding: 0 6px 0 10px;
@@ -2546,7 +2740,7 @@ defineExpose({
         height: 16px;
         border: none;
         background: transparent;
-        color: var(--gray-400);
+          color: var(--pm-muted);
         border-radius: 999px;
         font-size: 12px;
         line-height: 1;
@@ -2556,39 +2750,39 @@ defineExpose({
         cursor: pointer;
         flex-shrink: 0;
 
-        &:hover {
-          color: var(--gray-700);
-          background: rgba(15, 23, 42, 0.08);
-        }
+          &:hover {
+            color: var(--pm-text);
+            background: rgba(15, 23, 42, 0.08);
+          }
       }
 
       &:hover {
-        border-color: var(--main-200);
-        color: var(--main-700);
-        background: #eff6ff;
+        border-color: rgba(37, 99, 235, 0.22);
+        color: var(--pm-blue);
+        background: rgba(37, 99, 235, 0.08);
       }
 
       &.active {
-        border-color: var(--main-300);
-        color: var(--main-800);
-        background: #eaf4ff;
+        border-color: rgba(37, 99, 235, 0.3);
+        color: var(--pm-blue);
+        background: linear-gradient(135deg, rgba(217, 119, 6, 0.08), rgba(37, 99, 235, 0.1));
       }
     }
 
     .recent-overflow-trigger {
       height: 24px;
       border-radius: 999px;
-      border: 1px solid var(--gray-300);
-      background: var(--gray-0);
-      color: var(--gray-500);
+      border: 1px solid rgba(37, 99, 235, 0.14);
+      background: rgba(255, 255, 255, 0.44);
+      color: var(--pm-muted);
       padding: 0 10px;
       font-size: 12px;
       cursor: pointer;
       flex-shrink: 0;
 
       &:hover {
-        border-color: var(--main-300);
-        color: var(--main-700);
+        border-color: rgba(37, 99, 235, 0.3);
+        color: var(--pm-blue);
       }
     }
 
@@ -2600,7 +2794,7 @@ defineExpose({
   .editor-main {
     flex: 1;
     min-height: 0;
-    background-color: var(--gray-0);
+    background-color: rgba(255, 255, 255, 0.16);
     display: flex;
     flex-direction: column;
   }
@@ -2626,6 +2820,8 @@ defineExpose({
     font-family: 'Fira Code', 'Monaco', monospace;
     font-size: 16px;
     line-height: 1.6;
+    background: transparent;
+    color: var(--pm-text);
     &:focus {
       outline: none;
     }
@@ -2637,7 +2833,7 @@ defineExpose({
     overflow-y: auto;
     :deep(.md-editor) {
       height: 100%;
-      background: var(--gray-0);
+      background: transparent;
     }
     :deep(.md-editor-preview-wrapper) {
       padding: 16px 20px;
@@ -2700,10 +2896,10 @@ defineExpose({
 .parent-path-display {
   font-family: monospace;
   font-size: 13px;
-  color: #666;
-  background: #f5f5f5;
+  color: var(--pm-muted);
+  background: rgba(255, 255, 255, 0.42);
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: 999px;
 }
 
 .error-text {
@@ -2764,9 +2960,9 @@ defineExpose({
   }
 }
 
-  .editor-test-panel {
+.editor-test-panel {
   border-top: 1px solid @border-color;
-  background: linear-gradient(180deg, #f9fbff 0%, #f5f8ff 100%);
+  background: rgba(255, 255, 255, 0.34);
   min-height: 150px;
   max-height: 240px;
   display: flex;
@@ -2783,10 +2979,10 @@ defineExpose({
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-bottom: 1px solid #dfe8f4;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
     font-size: 13px;
     font-weight: 600;
-    color: var(--gray-700);
+    color: var(--pm-text);
     flex-shrink: 0;
 
     .editor-test-panel-header-actions {
@@ -2800,8 +2996,8 @@ defineExpose({
       font-family: 'Fira Code', 'Monaco', monospace;
       font-size: 12px;
       color: #1f4e7b;
-      background: #f3f8ff;
-      border: 1px solid #dce9f9;
+      background: rgba(255, 255, 255, 0.44);
+      border: 1px solid rgba(37, 99, 235, 0.14);
       border-radius: 999px;
       padding: 1px 8px;
       font-weight: 500;
@@ -2812,9 +3008,9 @@ defineExpose({
     }
 
     .editor-test-copy-btn {
-      border: 1px solid #cfdceb;
-      background: #ffffff;
-      color: #2b5f92;
+      border: 1px solid rgba(37, 99, 235, 0.14);
+      background: rgba(255, 255, 255, 0.46);
+      color: var(--pm-blue);
       height: 22px;
       border-radius: 999px;
       padding: 0 8px;
@@ -2826,8 +3022,8 @@ defineExpose({
       flex-shrink: 0;
 
       &:hover:not(:disabled) {
-        border-color: #aac7e8;
-        background: #f3f8ff;
+        border-color: rgba(37, 99, 235, 0.22);
+        background: rgba(37, 99, 235, 0.08);
         color: #1f4e7b;
       }
 
@@ -2854,7 +3050,7 @@ defineExpose({
       line-height: 1.65;
       white-space: pre-wrap;
       word-break: break-word;
-      color: var(--gray-800);
+      color: var(--pm-text);
       font-family: 'Fira Code', 'Monaco', monospace;
     }
   }
@@ -2865,8 +3061,8 @@ defineExpose({
     align-items: center;
     padding: 0 12px;
     font-size: 13px;
-    color: var(--gray-500);
-  }
+    color: var(--pm-muted);
+}
 }
 
 .tree-node-title {
@@ -2877,16 +3073,27 @@ defineExpose({
   white-space: nowrap;
 }
 
+.prompt-tree-node-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.prompt-tree-tag {
+  flex-shrink: 0;
+}
+
 :global(.publish-modal-wrap .ant-modal-content) {
-  border: 1px solid var(--color-primary-100);
-  border-radius: 12px;
-  box-shadow: 0 14px 30px var(--shadow-2);
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 24px;
+  box-shadow: var(--pm-shadow);
   overflow: hidden;
 }
 
 :global(.publish-modal-wrap .ant-modal-header) {
   border-bottom: 1px solid var(--gray-200);
-  background: linear-gradient(180deg, var(--main-5) 0%, var(--main-20) 100%);
+  background: linear-gradient(180deg, #fff9f2 0%, #eef6ff 100%);
   padding: 14px 20px;
 }
 
@@ -2907,26 +3114,26 @@ defineExpose({
 :global(.publish-modal-wrap .publish-form .ant-input),
 :global(.publish-modal-wrap .publish-form .ant-input-affix-wrapper),
 :global(.publish-modal-wrap .publish-form .ant-select-selector) {
-  border-radius: 8px;
-  border-color: var(--gray-200) !important;
+  border-radius: 16px;
+  border-color: rgba(15, 23, 42, 0.08) !important;
   box-shadow: none !important;
 }
 
 :global(.publish-modal-wrap .publish-form .ant-input:hover),
 :global(.publish-modal-wrap .publish-form .ant-input-affix-wrapper:hover),
 :global(.publish-modal-wrap .publish-form .ant-select:not(.ant-select-disabled):hover .ant-select-selector) {
-  border-color: var(--color-primary-500) !important;
+  border-color: rgba(37, 99, 235, 0.3) !important;
 }
 
 :global(.publish-modal-wrap .publish-form .ant-input:focus),
 :global(.publish-modal-wrap .publish-form .ant-input-affix-wrapper-focused),
 :global(.publish-modal-wrap .publish-form .ant-select-focused .ant-select-selector) {
-  border-color: var(--color-primary-500) !important;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary-500) 20%, transparent) !important;
+  border-color: rgba(37, 99, 235, 0.3) !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12) !important;
 }
 
 :global(.publish-modal-wrap .publish-form .ant-switch-checked) {
-  background: var(--color-primary-500);
+  background: linear-gradient(135deg, #d97706, #2563eb);
 }
 
 :global(.publish-modal-wrap .publish-form .ant-tag) {
@@ -2939,46 +3146,44 @@ defineExpose({
 }
 
 :global(.publish-modal-wrap .ant-modal-footer .ant-btn) {
-  border-radius: 8px;
+  border-radius: 999px;
   box-shadow: none;
 }
 
 :global(.publish-modal-wrap .ant-modal-footer .ant-btn-default) {
-  background: var(--main-0);
-  border-color: var(--color-primary-100);
-  color: var(--color-primary-700);
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(37, 99, 235, 0.18);
+  color: var(--pm-blue);
 }
 
 :global(.publish-modal-wrap .ant-modal-footer .ant-btn-default:hover),
 :global(.publish-modal-wrap .ant-modal-footer .ant-btn-default:focus) {
-  background: var(--color-primary-50);
-  border-color: var(--color-primary-500);
-  color: var(--color-primary-700);
+  background: rgba(37, 99, 235, 0.1);
+  border-color: rgba(37, 99, 235, 0.3);
+  color: #1d4ed8;
 }
 
 :global(.publish-modal-wrap .ant-modal-footer .ant-btn-default:active) {
-  background: var(--color-primary-100);
-  border-color: var(--color-primary-700);
-  color: var(--color-primary-900);
+  background: rgba(37, 99, 235, 0.14);
+  border-color: rgba(37, 99, 235, 0.42);
+  color: #1e40af;
 }
 
 :global(.publish-modal-wrap .ant-modal-footer .ant-btn-primary) {
-  background: var(--color-primary-500);
-  border-color: var(--color-primary-500);
-  color: var(--gray-0);
+  background: linear-gradient(135deg, #d97706, #2563eb);
+  border: none;
+  color: #fff;
 }
 
 :global(.publish-modal-wrap .ant-modal-footer .ant-btn-primary:hover),
 :global(.publish-modal-wrap .ant-modal-footer .ant-btn-primary:focus) {
-  background: var(--color-primary-700);
-  border-color: var(--color-primary-700);
-  color: var(--gray-0);
+  background: linear-gradient(135deg, #c26a05, #1f56c9);
+  color: #fff;
 }
 
 :global(.publish-modal-wrap .ant-modal-footer .ant-btn-primary:active) {
-  background: var(--color-primary-900);
-  border-color: var(--color-primary-900);
-  color: var(--gray-0);
+  background: linear-gradient(135deg, #a95c05, #1b4cac);
+  color: #fff;
 }
 
 :global(.publish-modal-wrap .ant-modal-footer .ant-btn[disabled]),
@@ -2989,15 +3194,15 @@ defineExpose({
 }
 
 :global(.prompt-test-modal-wrap .ant-modal-content) {
-  border: 1px solid var(--color-primary-100);
-  border-radius: 12px;
-  box-shadow: 0 14px 30px var(--shadow-2);
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 24px;
+  box-shadow: var(--pm-shadow);
   overflow: hidden;
 }
 
 :global(.prompt-test-modal-wrap .ant-modal-header) {
   border-bottom: 1px solid var(--gray-200);
-  background: linear-gradient(180deg, var(--main-5) 0%, var(--main-20) 100%);
+  background: linear-gradient(180deg, #fff9f2 0%, #eef6ff 100%);
   padding: 14px 20px;
 }
 
@@ -3016,19 +3221,19 @@ defineExpose({
 }
 
 :global(.prompt-test-modal-wrap .ant-select-selector) {
-  border-radius: 8px !important;
-  border-color: var(--gray-200) !important;
+  border-radius: 16px !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
   box-shadow: none !important;
   transition: all 0.2s ease;
 }
 
 :global(.prompt-test-modal-wrap .ant-select:not(.ant-select-disabled):hover .ant-select-selector) {
-  border-color: var(--color-primary-500) !important;
+  border-color: rgba(37, 99, 235, 0.3) !important;
 }
 
 :global(.prompt-test-modal-wrap .ant-select-focused .ant-select-selector) {
-  border-color: var(--color-primary-500) !important;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary-500) 20%, transparent) !important;
+  border-color: rgba(37, 99, 235, 0.3) !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12) !important;
 }
 
 :global(.prompt-test-modal-wrap .ant-select-selection-placeholder) {
@@ -3041,40 +3246,38 @@ defineExpose({
 }
 
 :global(.prompt-test-modal-wrap .ant-modal-footer .ant-btn) {
-  border-radius: 8px;
+  border-radius: 999px;
   box-shadow: none;
 }
 
 :global(.prompt-test-modal-wrap .ant-modal-footer .ant-btn-default) {
-  background: var(--main-0);
-  border-color: var(--color-primary-100);
-  color: var(--color-primary-700);
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(37, 99, 235, 0.18);
+  color: var(--pm-blue);
 }
 
 :global(.prompt-test-modal-wrap .ant-modal-footer .ant-btn-default:hover),
 :global(.prompt-test-modal-wrap .ant-modal-footer .ant-btn-default:focus) {
-  background: var(--color-primary-50);
-  border-color: var(--color-primary-500);
-  color: var(--color-primary-700);
+  background: rgba(37, 99, 235, 0.1);
+  border-color: rgba(37, 99, 235, 0.3);
+  color: #1d4ed8;
 }
 
 :global(.prompt-test-modal-wrap .ant-modal-footer .ant-btn-primary) {
-  background: var(--color-primary-500);
-  border-color: var(--color-primary-500);
-  color: var(--gray-0);
+  background: linear-gradient(135deg, #d97706, #2563eb);
+  border: none;
+  color: #fff;
 }
 
 :global(.prompt-test-modal-wrap .ant-modal-footer .ant-btn-primary:hover),
 :global(.prompt-test-modal-wrap .ant-modal-footer .ant-btn-primary:focus) {
-  background: var(--color-primary-700);
-  border-color: var(--color-primary-700);
-  color: var(--gray-0);
+  background: linear-gradient(135deg, #c26a05, #1f56c9);
+  color: #fff;
 }
 
 :global(.prompt-test-modal-wrap .ant-modal-footer .ant-btn-primary:active) {
-  background: var(--color-primary-900);
-  border-color: var(--color-primary-900);
-  color: var(--gray-0);
+  background: linear-gradient(135deg, #a95c05, #1b4cac);
+  color: #fff;
 }
 
 :global(.prompt-test-modal-wrap .ant-modal-footer .ant-btn[disabled]),
@@ -3085,44 +3288,44 @@ defineExpose({
 }
 
 :global(.prompt-test-model-dropdown) {
-  border: 1px solid var(--color-primary-100);
-  border-radius: 10px;
-  box-shadow: 0 8px 20px var(--shadow-2);
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 16px;
+  box-shadow: var(--pm-shadow);
   overflow: hidden;
 }
 
 :global(.prompt-test-model-dropdown .ant-select-item-option) {
-  color: var(--color-secondary-700);
+  color: var(--pm-text);
 }
 
 :global(.prompt-test-model-dropdown .ant-select-item-option-active:not(.ant-select-item-option-disabled)) {
-  background: var(--color-primary-50);
+  background: rgba(37, 99, 235, 0.08);
 }
 
 :global(.prompt-test-model-dropdown .ant-select-item-option-selected:not(.ant-select-item-option-disabled)) {
-  background: color-mix(in srgb, var(--color-primary-50) 65%, var(--main-0));
-  color: var(--color-primary-700);
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.1), rgba(37, 99, 235, 0.1));
+  color: var(--pm-blue);
   font-weight: 600;
 }
 
 :global(.prompt-manager-more-menu .ant-dropdown-menu) {
   padding: 6px;
-  border: 1px solid var(--color-primary-100);
-  border-radius: 10px;
-  background: var(--main-0);
-  box-shadow: 0 8px 20px var(--shadow-2);
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: var(--pm-shadow);
 }
 
 :global(.prompt-manager-more-menu .ant-dropdown-menu-item) {
-  border-radius: 7px;
-  color: var(--color-secondary-700);
+  border-radius: 10px;
+  color: var(--pm-text);
   transition: all 0.2s ease;
 }
 
 :global(.prompt-manager-more-menu .ant-dropdown-menu-item:hover),
 :global(.prompt-manager-more-menu .ant-dropdown-menu-item-active) {
-  background: var(--color-primary-50);
-  color: var(--color-primary-700);
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--pm-blue);
 }
 
 :global(.prompt-manager-more-menu .ant-dropdown-menu-item-danger) {

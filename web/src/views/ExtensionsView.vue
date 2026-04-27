@@ -48,7 +48,11 @@ const handleImportUpload = async ({ file, onSuccess, onError }) => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background-color: var(--gray-0);
+  padding: 28px;
+  background:
+    radial-gradient(circle at top left, rgba(245, 158, 11, 0.16), transparent 30%),
+    radial-gradient(circle at 88% 10%, rgba(37, 99, 235, 0.14), transparent 24%),
+    linear-gradient(180deg, #fff9f2, #eef6ff);
 
   .extensions-content {
     flex: 1;
@@ -60,6 +64,12 @@ const handleImportUpload = async ({ file, onSuccess, onError }) => {
       min-height: 0;
       overflow: hidden;
     }
+  }
+}
+
+@media (max-width: 900px) {
+  .extensions-view {
+    padding: 16px;
   }
 }
 </style>

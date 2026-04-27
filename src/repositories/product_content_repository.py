@@ -31,6 +31,12 @@ class ProductContentRepository:
         result = await self.db.execute(select(Product).where(Product.id == product_id))
         return result.scalar_one_or_none()
 
+    async def get_products_by_ids(self, product_ids: list[int]) -> list[Product]:
+        if not product_ids:
+            return []
+        result = await self.db.execute(select(Product).where(Product.id.in_(product_ids)))
+        return list(result.scalars().all())
+
     async def list_products(
         self,
         *,
@@ -97,6 +103,26 @@ class ProductContentRepository:
         query = query.order_by(ProductContentGeneration.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
         result = await self.db.execute(query)
         return list(result.scalars().all()), total
+
+    async def get_latest_generation_by_product(
+        self,
+        *,
+        user_id: int,
+        department_id: int | None,
+        product_id: int,
+    ) -> ProductContentGeneration | None:
+        query = select(ProductContentGeneration).where(
+            ProductContentGeneration.user_id == user_id,
+            ProductContentGeneration.product_id == product_id,
+        )
+        if department_id is None:
+            query = query.where(ProductContentGeneration.department_id.is_(None))
+        else:
+            query = query.where(ProductContentGeneration.department_id == department_id)
+
+        query = query.order_by(ProductContentGeneration.created_at.desc()).limit(1)
+        result = await self.db.execute(query)
+        return result.scalar_one_or_none()
 
     async def get_or_create_subscription(
         self,

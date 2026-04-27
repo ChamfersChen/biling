@@ -28,6 +28,11 @@ const route = useRoute()
 const router = useRouter()
 
 const isNormalUser = computed(() => userStore.userRole === 'user')
+const normalUserNavItems = computed(() => [
+  { name: '社区', path: '/community', icon: Users },
+  { name: '产品文案', path: '/product-content/generate', icon: Package }
+])
+
 const topHeaderTitle = computed(() => {
   if (route.path.startsWith('/product-content')) {
     return '产品文案'
@@ -80,6 +85,12 @@ onMounted(async () => {
 const mainList = computed(() => {
   const items = [
     {
+      name: '产品文案',
+      path: '/product-content/generate',
+      icon: Package,
+      activeIcon: Package
+    },
+    {
       name: '提示词管理',
       path: '/extensions/prompts',
       icon: BookText,
@@ -90,12 +101,6 @@ const mainList = computed(() => {
       path: '/community',
       icon: Users,
       activeIcon: Users
-    },
-    {
-      name: '产品文案',
-      path: '/product-content/generate',
-      icon: Package,
-      activeIcon: Package
     }
   ]
 
@@ -118,7 +123,22 @@ provide('settingsModal', {
             <img :src="infoStore.organization.avatar" />
           </router-link>
         </div>
-        <span class="top-header-title">{{ topHeaderTitle }}</span>
+        <div>
+          <span class="top-header-title">{{ topHeaderTitle }}</span>
+          <div class="top-header-subtitle">内容浏览与生成工作台</div>
+        </div>
+        <div class="top-header-nav">
+          <RouterLink
+            v-for="item in normalUserNavItems"
+            :key="item.path"
+            :to="item.path"
+            class="top-header-link"
+            :class="{ active: route.path.startsWith(item.path) }"
+          >
+            <component :is="item.icon" :size="15" />
+            <span>{{ item.name }}</span>
+          </RouterLink>
+        </div>
       </div>
       <div class="top-header-right">
         <div class="nav-item user-info">
@@ -403,10 +423,62 @@ div.header,
   color: var(--gray-1000);
 }
 
+.top-header-subtitle {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
+.top-header-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 10px;
+}
+
+.top-header-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--gray-100);
+  color: var(--gray-700);
+  background: var(--gray-0);
+  text-decoration: none;
+  transition: all 0.2s ease-in-out;
+}
+
+.top-header-link:hover,
+.top-header-link.active {
+  color: var(--main-color);
+  border-color: var(--main-100);
+  background: var(--main-20);
+}
+
 .top-header-right {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .top-header {
+    height: auto;
+    padding: 10px 14px;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .top-header-left {
+    flex-wrap: wrap;
+  }
+
+  .top-header-nav {
+    width: 100%;
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
 }
 
 .app-layout.normal-user #app-router-view {

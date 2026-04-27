@@ -14,7 +14,7 @@
 ### 1.2 范围
 
 - 保留现有多租户能力（用户/部门隔离）
-- 复用现有认证、模板市场、提示词管理框架
+- 复用现有认证、社区、提示词管理框架
 - 新增产品管理、文案生成、图片提示词、生图、配额控制
 
 ### 1.3 非范围（当前版本不做）
@@ -399,7 +399,7 @@ CREATE INDEX idx_ps_status ON product_subscriptions(status);
 ## 10. 与现有模块复用点
 
 - 认证：`server/utils/auth_middleware.py`
-- 模板市场：`/market` 复用，新增类目过滤（按`category`）
+- 社区：复用现有模板发布与内容分发能力
 - Prompt 管理：生成结果可回存提示词节点
 - MinIO：复用上传链路
 
@@ -425,9 +425,9 @@ CREATE INDEX idx_ps_status ON product_subscriptions(status);
 - 接入图片生成 API
 - 生图结果上传 MinIO 并回写记录
 
-### 11.4 第四阶段（市场联动与打磨，1-2 天）
+### 11.4 第四阶段（联动与打磨，1-2 天）
 
-- `/market` 类目筛选联动
+- 社区内容联动与筛选体验优化
 - 错误态、空态、移动端适配
 - 回归测试
 
@@ -448,7 +448,7 @@ CREATE INDEX idx_ps_status ON product_subscriptions(status);
 ### 12.3 回归测试
 
 - 现有 Prompt 管理不受影响
-- 现有模板市场功能正常
+- 现有社区与 Prompt 管理功能正常
 
 ## 13. 风险与应对
 

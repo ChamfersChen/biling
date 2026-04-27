@@ -45,7 +45,7 @@ class Config(BaseModel):
     # 模型配置
     # ============================================================
     default_model: str = Field(
-        default="openai//models/Qwen3-4B-Instruct-2507",
+        default="siliconflow/Qwen/Qwen3.5-9B",
         description="默认对话模型",
     )
     fast_model: str = Field(

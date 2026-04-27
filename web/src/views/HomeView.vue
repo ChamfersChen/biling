@@ -1,13 +1,11 @@
 <template>
-  <div class="home-container">
-    <!-- 加载中状态 -->
-    <div v-if="isLoading" class="loading-container">
+  <div class="home-shell">
+    <div v-if="isLoading" class="state-panel state-panel--center">
       <a-spin size="large" />
-      <p class="loading-text">正在连接服务...</p>
+      <p>正在连接服务并加载品牌信息...</p>
     </div>
 
-    <!-- 错误状态 -->
-    <div v-else-if="error" class="error-container">
+    <div v-else-if="error" class="state-panel state-panel--error">
       <a-result status="error" :title="error.title" :sub-title="error.message">
         <template #extra>
           <a-button type="primary" @click="retryLoad">重试</a-button>
@@ -15,102 +13,156 @@
       </a-result>
     </div>
 
-    <!-- 正常内容 -->
     <template v-else>
-      <div class="hero-section">
-      <div class="glass-header">
-        <div class="logo">
+      <header class="site-header">
+        <div class="brand-block">
           <img
+            v-if="infoStore.organization.logo"
             :src="infoStore.organization.logo"
             :alt="infoStore.organization.name"
-            class="logo-img"
+            class="brand-logo"
           />
-          <span class="logo-text">{{ infoStore.organization.name }}</span>
-        </div>
-        <nav class="nav-links">
-<router-link
-            to="/extensions/prompts"
-            class="nav-link"
-            v-if="userStore.isLoggedIn && userStore.isAdmin"
-          >
-            <span>提示词管理</span>
-          </router-link>
-          <router-link
-            to="/market"
-            class="nav-link"
-            v-if="userStore.isLoggedIn"
-          >
-            <span>社区</span>
-          </router-link>
-        </nav>
-        <div class="header-actions">
-          <div class="github-link">
-            <a href="https://github.com/ChamfersChen/prompta" target="_blank">
-              <svg height="20" width="20" viewBox="0 0 16 16" version="1.1">
-                <path
-                  fill-rule="evenodd"
-                  d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
-                ></path>
-              </svg>
-            </a>
+          <div>
+            <p class="brand-kicker">Prompt Workspace</p>
+            <h1 class="brand-name">{{ infoStore.organization.name || infoStore.branding.name || 'Prompta' }}</h1>
           </div>
+        </div>
+
+        <nav class="top-nav">
+          <button class="nav-link nav-link--button" type="button" @click="handleProtectedNav('/product-content/generate')">
+            产品文案
+          </button>
+          <button class="nav-link nav-link--button" type="button" @click="handleProtectedNav('/extensions/prompts')">
+            提示词管理
+          </button>
+          <button class="nav-link nav-link--button" type="button" @click="handleProtectedNav('/community')">
+            社区
+          </button>
+        </nav>
+
+        <div class="header-actions">
+          <a href="https://github.com/ChamfersChen/prompta" target="_blank" rel="noopener noreferrer" class="github-link">
+            <Github :size="16" />
+            <span>GitHub</span>
+          </a>
           <UserInfoComponent :show-button="true" />
         </div>
-      </div>
+      </header>
 
-      <div class="hero-layout">
-        <div class="hero-content">
-          <h1 class="title">{{ infoStore.branding.title }}</h1>
-          <p class="subtitle">{{ infoStore.branding.subtitle }}</p>
-          <!-- <p class="description">{{ infoStore.branding.description }}</p> -->
-          <div class="hero-actions">
-            <button class="button-base primary" @click="goToWorkspace">
-              {{ userStore.isLoggedIn ? '进入工作台' : '立即登录' }}
-            </button>
-          </div>
-        </div>
-        <div class="insight-panel" v-if="featureCards.length">
-          <div class="stat-card" v-for="card in featureCards" :key="card.label">
-            <div class="stat-headline">
-              <span class="stat-icon" v-if="card.icon">
-                <component :is="card.icon" />
-              </span>
-              <p class="stat-value">{{ card.value }}</p>
+      <main class="home-main">
+        <section class="hero-card">
+          <div class="hero-copy">
+            <p class="eyebrow">统一管理提示词、社区分发与产品内容生成</p>
+            <h2 class="hero-title">从提示词资产到社区分发，再到产品文案与生图，一套界面完成协作闭环。</h2>
+            <p class="hero-subtitle">
+              {{ infoStore.branding.subtitle || '面向运营、内容和业务团队的 AI 工作台' }}
+            </p>
+
+            <div class="hero-actions">
+              <button class="hero-btn hero-btn--primary" @click="goToWorkspace">
+                {{ primaryActionLabel }}
+              </button>
             </div>
-            <p class="stat-label">{{ card.label }}</p>
-            <p class="stat-description">{{ card.description }}</p>
+
+            <div class="hero-metrics">
+              <div class="metric-tile" v-for="item in headlineMetrics" :key="item.label">
+                <p class="metric-value">{{ item.value }}</p>
+                <p class="metric-label">{{ item.label }}</p>
+                <p class="metric-note">{{ item.note }}</p>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- <div class="section action-section" v-if="actionLinks.length">
-      <div class="action-grid">
-        <a
-          v-for="action in actionLinks"
-          :key="action.name"
-          class="action-card"
-          :href="action.url"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <span class="action-icon" v-if="action.icon">
-            <component :is="action.icon" />
-          </span>
-          <div class="action-meta">
-            <p class="action-title">{{ action.name }}</p>
-            <p class="action-url">{{ action.url }}</p>
+          <div class="hero-side">
+            <div class="workspace-preview">
+              <div class="preview-header">
+                <span class="preview-pill">当前系统能力</span>
+                <span class="preview-status">在线工作台</span>
+              </div>
+
+              <div class="preview-stack">
+                <div class="preview-module preview-module--highlight">
+                  <div>
+                    <p class="module-kicker">Content Studio</p>
+                    <h3>产品文案生成</h3>
+                    <p>支持已存产品复用、结果回看、单条生图、订阅配额。</p>
+                  </div>
+                  <Sparkles :size="18" />
+                </div>
+
+                <div class="preview-grid">
+                  <div class="preview-module" v-for="module in previewModules" :key="module.title">
+                    <component :is="module.icon" :size="18" class="module-icon" />
+                    <p class="module-title">{{ module.title }}</p>
+                    <p class="module-desc">{{ module.description }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </a>
-      </div>
-    </div> -->
+        </section>
 
-      <ProjectOverview />
+        <section class="section-block capability-block">
+          <div class="section-heading">
+            <p class="section-kicker">Platform</p>
+            <h3>围绕当前系统功能重新组织首页信息架构</h3>
+            <p>不只是展示产品介绍，而是把今天已经可用的功能路径直接呈现出来。</p>
+          </div>
 
-      <footer class="footer">
-        <div class="footer-content">
-          <p class="copyright">{{ infoStore.footer?.copyright || '© 2025 All rights reserved' }}</p>
-        </div>
+          <div class="capability-grid">
+            <article class="capability-card" v-for="item in capabilityCards" :key="item.title">
+              <div class="capability-icon">
+                <component :is="item.icon" :size="18" />
+              </div>
+              <h4>{{ item.title }}</h4>
+              <p>{{ item.description }}</p>
+              <span>{{ item.footnote }}</span>
+            </article>
+          </div>
+        </section>
+
+        <section class="section-block route-block">
+          <div class="section-heading">
+            <p class="section-kicker">Entry Points</p>
+            <h3>按角色进入最合适的工作入口</h3>
+            <p>管理员管理资产与结构，普通用户直接进入内容消费和生产流程。</p>
+          </div>
+
+          <div class="route-grid">
+            <article class="route-card" v-for="item in entryRoutes" :key="item.title">
+              <div class="route-top">
+                <component :is="item.icon" :size="18" />
+                <span>{{ item.tag }}</span>
+              </div>
+              <h4>{{ item.title }}</h4>
+              <p>{{ item.description }}</p>
+              <button class="route-link" @click="navigateTo(item.to)">{{ item.action }}</button>
+            </article>
+          </div>
+        </section>
+
+        <section class="section-block insight-block" v-if="featureCards.length">
+          <div class="section-heading">
+            <p class="section-kicker">Signals</p>
+            <h3>来自品牌配置的附加信息</h3>
+            <p>保留系统配置中的业务指标、亮点和说明信息。</p>
+          </div>
+
+          <div class="insight-grid">
+            <article class="insight-card" v-for="card in featureCards" :key="card.label">
+              <div class="insight-icon" v-if="card.icon">
+                <component :is="card.icon" :size="18" />
+              </div>
+              <p class="insight-value">{{ card.value || '--' }}</p>
+              <p class="insight-label">{{ card.label }}</p>
+              <p class="insight-desc">{{ card.description || '来自系统配置的补充说明' }}</p>
+            </article>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <p>{{ infoStore.footer?.copyright || '© 2025 All rights reserved' }}</p>
       </footer>
     </template>
   </div>
@@ -121,22 +173,24 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useInfoStore } from '@/stores/info'
-// import { useAgentStore } from '@/stores/agent'
-import { useThemeStore } from '@/stores/theme'
 import { healthApi } from '@/apis/system_api'
-import { Result, Button } from 'ant-design-vue'
+import { Result, Button, message } from 'ant-design-vue'
 import UserInfoComponent from '@/components/UserInfoComponent.vue'
-import ProjectOverview from '@/components/ProjectOverview.vue'
 import {
-  BookText,
-  Bug,
-  Video,
-  Route,
+  Sparkles,
+  Bot,
+  FolderTree,
+  Globe2,
+  Image,
+  FileText,
+  ShieldCheck,
+  BadgeDollarSign,
+  Wand2,
+  Compass,
   Github,
-  Star,
   CheckCircle2,
   GitCommit,
-  ShieldCheck
+  Star
 } from 'lucide-vue-next'
 
 const AResult = Result
@@ -145,10 +199,7 @@ const AButton = Button
 const router = useRouter()
 const userStore = useUserStore()
 const infoStore = useInfoStore()
-// const agentStore = useAgentStore()
-const themeStore = useThemeStore()
 
-// 加载状态
 const isLoading = ref(true)
 const error = ref(null)
 
@@ -172,9 +223,7 @@ const loadData = async () => {
   error.value = null
 
   try {
-    // 先检查健康状态
     await checkHealth()
-    // 健康检查通过后加载配置
     await infoStore.loadInfoConfig()
   } catch (e) {
     console.error('加载失败:', e)
@@ -187,30 +236,131 @@ const retryLoad = () => {
   loadData()
 }
 
-const goToWorkspace = async () => {
-  // 检查用户是否登录
+const goToWorkspace = () => {
   if (!userStore.isLoggedIn) {
-    sessionStorage.setItem('redirect', '/') // 设置为首页，登录后会通过路由守卫处理重定向
+    sessionStorage.setItem('redirect', '/product-content/generate')
     router.push('/login')
     return
   }
 
-  if (userStore.isAdmin) {
-    router.push('/extensions/prompts')
+  router.push('/product-content/generate')
+}
+
+const handleProtectedNav = (to) => {
+  if (!userStore.isLoggedIn) {
+    sessionStorage.setItem('redirect', to)
+    router.push('/login')
     return
   }
 
-  router.push('/market')
+  if (to === '/extensions/prompts' && !userStore.isAdmin) {
+    message.info('提示词管理仅管理员可用，已为你打开社区')
+    router.push('/community')
+    return
+  }
+
+  router.push(to)
 }
 
-onMounted(() => {
-  // 加载数据
-  loadData()
+const navigateTo = (to) => {
+  if (!userStore.isLoggedIn) {
+    sessionStorage.setItem('redirect', to)
+    router.push('/login')
+    return
+  }
+  router.push(to)
+}
+
+const primaryActionLabel = computed(() => {
+  if (!userStore.isLoggedIn) {
+    return '登录并开始使用'
+  }
+  if (userStore.isAdmin) {
+    return '进入系统'
+  }
+  return '进入产品文案工作台'
 })
+
+const headlineMetrics = computed(() => [
+  { label: '核心模块', value: '3', note: '提示词管理、社区、产品文案' },
+  { label: '内容链路', value: 'End-to-End', note: '从资产维护到生成、分发与复用' },
+  { label: '订阅档位', value: '3', note: 'free / pro / enterprise 配额体系' }
+])
+
+const previewModules = computed(() => [
+  { icon: FolderTree, title: '提示词管理', description: '目录树、变量识别、测试与发布到社区' },
+  { icon: Globe2, title: '社区协作', description: '分类浏览、收藏互动、内容传播与沉淀' },
+  { icon: Image, title: '图片生成', description: '基于文案结果逐条触发生图流程' }
+])
+
+const capabilityCards = computed(() => [
+  {
+    icon: Wand2,
+    title: '通用产品文案工作台',
+    description: '支持产品资料保存、风格组合、渠道适配、历史批次回看和最近结果复用。',
+    footnote: '覆盖 generate / history / subscription'
+  },
+  {
+    icon: FolderTree,
+    title: '提示词资产管理',
+    description: '通过目录树维护提示词文件、变量结构、测试结果，并可直接发布到社区。',
+    footnote: '适合管理员与运营维护知识资产'
+  },
+  {
+    icon: Globe2,
+    title: '社区分发与复用',
+    description: '社区页承担浏览、发现、筛选和内容复用能力。',
+    footnote: '把内部资产变成可共享的内容单元'
+  },
+  {
+    icon: BadgeDollarSign,
+    title: '订阅与配额治理',
+    description: '按套餐控制每日和每月使用量，支持面向业务侧的清晰容量展示。',
+    footnote: 'free / pro / enterprise'
+  },
+  {
+    icon: ShieldCheck,
+    title: '多租户与权限体系',
+    description: '复用现有 user_id、department_id 和鉴权体系，管理员与普通用户路径分离。',
+    footnote: '保持现有后端组织结构与安全边界'
+  },
+  {
+    icon: Bot,
+    title: 'AI 生成闭环',
+    description: '从 Prompt 构建、结构化结果解析，到图片生成与对象存储上传已经串联。',
+    footnote: '内容与视觉资产可连续生产'
+  }
+])
+
+const entryRoutes = computed(() => [
+  {
+    icon: FileText,
+    tag: 'Generate',
+    title: '产品文案',
+    description: '进入产品文案生成台，创建新产品、复用已存产品、查看最近结果并逐条生图。',
+    action: '打开工作台',
+    to: '/product-content/generate'
+  },
+  {
+    icon: Compass,
+    tag: 'Discover',
+    title: '社区',
+    description: '浏览社区内容、分类和文件夹视角，查看详情并参与交流。',
+    action: '浏览社区',
+    to: '/community'
+  },
+  {
+    icon: FolderTree,
+    tag: 'Admin',
+    title: '提示词管理',
+    description: '管理员可维护提示词目录、测试变量与发布状态，持续经营提示词资产。',
+    action: '管理提示词',
+    to: '/extensions/prompts'
+  }
+])
 
 const iconKey = (value) => (typeof value === 'string' ? value.toLowerCase() : '')
 
-// region icon_mapping
 const featureIconMap = {
   stars: Star,
   issues: CheckCircle2,
@@ -219,21 +369,6 @@ const featureIconMap = {
   license: ShieldCheck,
   default: Star
 }
-
-const actionIconMap = {
-  doc: BookText,
-  docs: BookText,
-  document: BookText,
-  issue: Bug,
-  bug: Bug,
-  roadmap: Route,
-  plan: Route,
-  demo: Video,
-  video: Video,
-  github: Github,
-  default: Github
-}
-// endregion icon_mapping
 
 const featureCards = computed(() => {
   const list = Array.isArray(infoStore.features) ? infoStore.features : []
@@ -259,577 +394,500 @@ const featureCards = computed(() => {
     .filter((item) => item.label || item.value || item.description)
 })
 
-const actionLinks = computed(() => {
-  const actions = infoStore.actions
-  if (!Array.isArray(actions)) {
-    return []
-  }
-
-  return actions
-    .map((item) => {
-      const key = iconKey(item?.icon || item?.type)
-      return {
-        name: item?.name || item?.label || '',
-        url: item?.url || item?.link || '',
-        icon: actionIconMap[key] || actionIconMap.default
-      }
-    })
-    .filter((item) => item.name && item.url)
+onMounted(() => {
+  loadData()
 })
 </script>
 
 <style lang="less" scoped>
-.home-container {
+.home-shell {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  color: var(--main-900);
-  background: radial-gradient(circle at top right, var(--main-50), transparent 60%), var(--main-5);
-  position: relative;
-  overflow-x: hidden;
+  color: #172033;
+  background:
+    radial-gradient(circle at top left, rgba(245, 158, 11, 0.18), transparent 28%),
+    radial-gradient(circle at 88% 12%, rgba(37, 99, 235, 0.14), transparent 24%),
+    linear-gradient(180deg, #fff9f2, #eef6ff 42%, #f9fbff 100%);
 }
 
-// 加载中状态
-.loading-container {
+.state-panel {
+  min-height: 100vh;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 16px;
 
-  .loading-text {
-    color: var(--gray-600);
-    font-size: 0.95rem;
+  &--error {
+    padding: 24px;
+  }
+
+  p {
+    margin: 0;
+    color: #60708a;
   }
 }
 
-// 错误状态
-.error-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  padding: 2rem;
-}
-.glass-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  padding: 0.75rem 2.5rem;
-  background-color: var(--color-trans-light);
-  backdrop-filter: blur(20px);
-  // border-bottom: 1px solid var(--main-30);
-  position: fixed;
+.site-header {
+  position: sticky;
   top: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  box-shadow: 0 6px 25px rgba(3, 80, 101, 0.02);
-}
-
-.nav-links {
+  z-index: 20;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 28px;
+  background: rgba(255, 255, 255, 0.42);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.56);
+  backdrop-filter: blur(18px);
 }
 
-.nav-link {
+.brand-block {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 1rem;
+  gap: 14px;
+}
+
+.brand-logo {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  border-radius: 12px;
+}
+
+.brand-kicker {
+  margin: 0 0 2px;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #60708a;
+}
+
+.brand-name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #172033;
+}
+
+.top-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.nav-link,
+.github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  color: #42526b;
   text-decoration: none;
-  color: var(--gray-800);
-  font-weight: 500;
-  font-size: 0.95rem;
-  transition: color 0.2s ease;
-  position: relative;
-  overflow: hidden;
+  background: rgba(255, 255, 255, 0.46);
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  transition: all 0.2s ease;
+}
 
-  &:hover {
-    color: var(--gray-900);
+.nav-link--button {
+  appearance: none;
+  cursor: pointer;
+}
 
-    svg {
-      transform: scale(1.1);
-    }
-  }
-
-  &.router-link-active {
-    background: linear-gradient(135deg, var(--main-600), var(--main-500));
-    color: var(--gray-0);
-    border-radius: 1.5rem;
-
-    &:hover {
-      background: linear-gradient(135deg, var(--main-700), var(--main-600));
-    }
-  }
-
-  span {
-    white-space: nowrap;
-  }
+.nav-link:hover,
+.nav-link.router-link-active,
+.github-link:hover {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
+  border-color: rgba(37, 99, 235, 0.22);
 }
 
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 12px;
 }
 
-.logo {
-  display: flex;
-  align-items: center;
-  font-size: 1.4rem;
-  font-weight: bold;
-  color: var(--main-800);
-
-  .logo-img {
-    height: 2rem;
-    margin-right: 0.6rem;
-  }
-}
-
-.logo-text {
-  font-size: 1.3rem;
-  font-weight: 600;
-}
-
-.github-link a {
-  display: flex;
-  align-items: center;
-  text-decoration: none;
-  color: var(--gray-600);
-  padding: 0.6rem 1rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  font-size: 0.9rem;
-  font-weight: 500;
-
-  &:hover {
-    color: var(--gray-700);
-
-    svg {
-      transform: scale(1.1);
-    }
-  }
-
-  svg {
-    margin-right: 6px;
-    transition: transform 0.3s ease;
-    fill: currentColor;
-  }
-
-  .stars-count {
-    font-weight: 600;
-  }
-
-  // 暗色模式样式
-  :global(.dark) & {
-    color: var(--gray-400);
-
-    &:hover {
-      color: var(--gray-300);
-    }
-  }
-}
-
-.hero-section {
-  flex: 1;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 5rem 2rem 2rem;
-}
-
-.hero-layout {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 2.5rem;
-  align-items: center;
-  max-width: 1200px;
+.home-main {
+  width: min(1280px, calc(100% - 32px));
   margin: 0 auto;
-  padding-top: 4rem;
+  padding: 28px 0 48px;
 }
 
-.hero-content {
+.hero-card,
+.section-block,
+.overview-panel {
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.56);
+  box-shadow: 0 24px 52px rgba(27, 52, 92, 0.12);
+  backdrop-filter: blur(18px);
+}
+
+.hero-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);
+  gap: 28px;
+  padding: 34px;
+}
+
+.eyebrow,
+.section-kicker,
+.module-kicker {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #d97706;
+}
+
+.hero-copy {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 18px;
 }
 
-.title {
-  font-size: clamp(2.5rem, 4vw, 4rem);
-  font-weight: 800;
+.hero-title {
   margin: 0;
-  background: linear-gradient(135deg, var(--main-900), var(--main-600));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+  font-size: clamp(36px, 5vw, 62px);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  color: #172033;
 }
 
-.hero-eyebrow {
-  color: var(--main-600);
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
-  font-size: 0.85rem;
-}
-
-.subtitle {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--gray-700);
-  line-height: 1.4;
-}
-
-.description {
-  color: var(--gray-600);
-  line-height: 1.6;
+.hero-subtitle {
+  margin: 0;
+  max-width: 760px;
+  font-size: 18px;
+  line-height: 1.7;
+  color: #4b5d79;
 }
 
 .hero-actions {
   display: flex;
+  gap: 12px;
   flex-wrap: wrap;
-  gap: 1rem;
-  align-items: center;
 }
 
-.button-base {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  padding: 0.5rem 2.75rem;
+.hero-btn {
+  min-height: 48px;
+  padding: 0 20px;
   border-radius: 999px;
-  font-size: 1.05rem;
-  font-weight: 600;
-  cursor: pointer;
   border: 1px solid transparent;
-  text-decoration: none;
-  transition: all 0.25s ease;
-  min-height: 52px;
-}
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
 
-.button-base.primary {
-  background: linear-gradient(135deg, var(--main-600), var(--main-500));
-  color: var(--gray-0);
-  border-color: var(--main-600);
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--main-700) 25%, transparent);
-
-  &:hover,
-  &:focus {
-    background: linear-gradient(135deg, var(--main-700), var(--main-600));
-    border-color: var(--main-700);
-    color: var(--gray-0);
+  &--primary {
+    color: #fff;
+    background: linear-gradient(135deg, #d97706, #2563eb);
+    box-shadow: 0 16px 28px rgba(37, 99, 235, 0.18);
   }
 
-  &:active {
-    background: linear-gradient(135deg, var(--main-800), var(--main-700));
-    border-color: var(--main-800);
-    color: var(--gray-0);
+  &--primary:hover {
+    background: linear-gradient(135deg, #c26a05, #1f56c9);
   }
-}
 
-.button-base.secondary {
-  background: rgba(2, 57, 68, 0.06);
-  color: var(--main-700);
-  border-color: var(--gray-100);
+  &--secondary {
+    color: #2563eb;
+    background: rgba(255, 255, 255, 0.52);
+    border-color: rgba(37, 99, 235, 0.18);
+  }
 
-  &:hover {
-    border-color: var(--main-200);
-    background: var(--gray-50);
+  &--secondary:hover {
+    background: rgba(37, 99, 235, 0.08);
   }
 }
 
-.insight-panel {
+.hero-metrics {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 1rem;
-  background: var(--main-0);
-  border-radius: 1.5rem;
-  padding: 1.5rem;
-  border: 1px solid var(--main-40);
-  box-shadow: 0 15px 35px rgba(3, 80, 101, 0.08);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 8px;
 }
 
-.stat-card {
+.metric-tile,
+.preview-module,
+.capability-card,
+.route-card,
+.insight-card {
+  background: rgba(255, 255, 255, 0.34);
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  backdrop-filter: blur(12px);
+}
+
+.metric-tile {
+  padding: 18px;
+  border-radius: 22px;
+}
+
+.metric-value {
+  margin: 0 0 6px;
+  font-size: 24px;
+  font-weight: 800;
+  color: #172033;
+}
+
+.metric-label {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #2d3d57;
+}
+
+.metric-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #60708a;
+}
+
+.hero-side,
+.workspace-preview,
+.preview-stack {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
 }
 
-.stat-headline {
+.workspace-preview {
+  height: 100%;
+  padding: 22px;
+  border-radius: 26px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.46), rgba(255, 255, 255, 0.24));
+  border: 1px solid rgba(255, 255, 255, 0.58);
+}
+
+.preview-header,
+.route-top {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  justify-content: space-between;
 }
 
-.stat-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: var(--gray-25);
+.preview-pill,
+.preview-status,
+.route-top span {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-
-  :deep(svg) {
-    width: 24px;
-    height: 24px;
-    color: var(--main-700);
-  }
-}
-
-.stat-value {
-  font-size: 2rem;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
   font-weight: 700;
-  color: var(--main-800);
-  margin: 0;
 }
 
-.stat-label {
-  margin: 0;
-  color: var(--gray-700);
-  font-weight: 600;
+.preview-pill {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.08);
 }
 
-.stat-description {
-  margin: 0;
-  color: var(--gray-600);
-  font-size: 0.9rem;
+.preview-status,
+.route-top span {
+  color: #b45309;
+  background: rgba(217, 119, 6, 0.1);
 }
 
-.section {
-  width: 100%;
-  max-width: 1200px;
-  margin: 50px auto 0px auto;
-  padding: 2rem 0;
+.preview-stack {
+  gap: 12px;
+  margin-top: 18px;
 }
 
-.section-header {
-  margin-bottom: 1.5rem;
-
-  h2 {
-    margin: 0 0 0.5rem;
-    font-size: 1.8rem;
-    color: var(--main-800);
-  }
-
-  p {
-    margin: 0;
-    color: var(--gray-600);
-  }
+.preview-module {
+  padding: 16px;
+  border-radius: 20px;
 }
 
-.action-section {
-  padding-bottom: 3rem;
-}
-
-.action-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1rem;
-}
-
-.action-card {
+.preview-module--highlight {
   display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  padding: 1rem 1.25rem;
-  border-radius: 1rem;
-  text-decoration: none;
-  color: inherit;
-  border: 1px solid var(--gray-50);
-  background: var(--gray-0);
-  transition:
-    transform 0.2s ease,
-    background 0.2s ease;
-
-  &:hover {
-    background: var(--gray-0);
-    transform: translateY(-2px);
-  }
+  align-items: flex-start;
+  justify-content: space-between;
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.12), rgba(37, 99, 235, 0.12));
 }
 
-.action-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: var(--gray-50);
+.preview-module h3,
+.module-title,
+.capability-card h4,
+.route-card h4 {
+  margin: 6px 0 8px;
+  color: #172033;
+}
+
+.preview-module p,
+.module-desc,
+.capability-card p,
+.route-card p,
+.insight-desc,
+.section-heading p {
+  margin: 0;
+  color: #60708a;
+  line-height: 1.65;
+}
+
+.preview-grid,
+.capability-grid,
+.route-grid,
+.insight-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.preview-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.module-icon,
+.capability-icon {
+  color: #2563eb;
+}
+
+.module-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.module-desc {
+  font-size: 13px;
+}
+
+.section-block,
+.overview-panel {
+  margin-top: 18px;
+  padding: 28px;
+}
+
+.section-heading {
+  max-width: 720px;
+  margin-bottom: 18px;
+}
+
+.section-heading h3 {
+  margin: 8px 0 10px;
+  font-size: 28px;
+  color: #172033;
+}
+
+.capability-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.capability-card,
+.route-card,
+.insight-card {
+  padding: 20px;
+  border-radius: 24px;
+}
+
+.capability-card span {
+  display: inline-block;
+  margin-top: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.route-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.route-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.route-link {
+  align-self: flex-start;
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: #2563eb;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.insight-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.insight-icon {
+  width: 40px;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-
-  :deep(svg) {
-    width: 22px;
-    height: 22px;
-    color: var(--main-700);
-  }
+  border-radius: 14px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
 }
 
-.action-meta {
-  flex: 1;
-  overflow: hidden;
+.insight-value {
+  margin: 12px 0 6px;
+  font-size: 28px;
+  font-weight: 800;
+  color: #172033;
 }
 
-.action-title {
-  margin: 0;
-  font-weight: 600;
-  color: var(--main-800);
+.insight-label {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #2d3d57;
 }
 
-.action-url {
-  margin: 0.25rem 0 0;
-  font-size: 0.9rem;
-  color: var(--gray-600);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.preview-section {
-  padding: 5rem 2rem;
-  display: flex;
-  justify-content: center;
-}
-
-.preview-container {
-  position: relative;
-  max-width: 1000px;
-  overflow: hidden;
-  border-radius: 1rem;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-
-  &:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
-
-    .preview-overlay {
-      opacity: 1;
-    }
-  }
-
-  img {
-    width: 100%;
-    height: auto;
-    display: block;
-    transition: transform 0.5s ease;
-  }
-
-  .preview-overlay {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
-    padding: 2rem;
-    opacity: 0.8;
-    transition: opacity 0.3s ease;
-
-    .overlay-content {
-      color: var(--gray-0);
-
-      h3 {
-        font-size: 1.5rem;
-        margin-bottom: 0.5rem;
-      }
-
-      p {
-        font-size: 1rem;
-        opacity: 0.9;
-      }
-    }
-  }
-}
-
-.footer {
-  margin-top: auto;
-  background: var(--main-0);
-  border-top: 1px solid var(--main-20);
-  position: relative;
-  z-index: 10;
-}
-
-.footer-content {
+.site-footer {
+  padding: 0 24px 32px;
   text-align: center;
-  padding: 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
 }
 
-.copyright {
-  color: var(--main-700);
-  font-size: 0.9rem;
-  font-weight: 500;
+.site-footer p {
   margin: 0;
-  opacity: 0.8;
-  transition: opacity 0.3s ease;
+  color: #60708a;
 }
 
-.footer:hover .copyright {
-  opacity: 1;
-}
-
-@media (max-width: 768px) {
-  .glass-header {
-    padding: 0.8rem 1.25rem;
-    flex-wrap: wrap;
-    gap: 1rem;
+@media (max-width: 1120px) {
+  .hero-card,
+  .capability-grid,
+  .route-grid {
+    grid-template-columns: 1fr;
   }
 
-  .nav-links {
-    order: 3;
-    width: 100%;
+  .hero-metrics,
+  .preview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .site-header {
+    position: static;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 16px;
+  }
+
+  .top-nav,
+  .header-actions {
     justify-content: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
   }
 
-  .nav-link {
-    padding: 0.5rem 0.8rem;
-    font-size: 0.85rem;
-
-    span {
-      display: none;
-    }
+  .home-main {
+    width: calc(100% - 20px);
+    padding: 10px 0 24px;
   }
 
-  .logo {
-    font-size: 1.1rem;
+  .hero-card,
+  .section-block,
+  .overview-panel {
+    padding: 18px;
+    border-radius: 24px;
   }
 
-  .title {
-    font-size: 2.4rem;
-  }
-
-  .subtitle {
-    font-size: 1.2rem;
-  }
-
-  .start-button {
-    width: 100%;
-    text-align: center;
-  }
-
-  .hero-content {
-    padding: 0;
-  }
-
-  .github-link a {
-    padding: 0.5rem 0.8rem;
-    font-size: 0.85rem;
-
-    .stars-count {
-      display: none;
-    }
-  }
-
-  .hero-layout {
-    padding: 0 0.5rem;
+  .hero-title {
+    font-size: 34px;
   }
 }
 </style>
