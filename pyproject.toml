@@ -1,7 +1,7 @@
 [project]
-name = "prompta"
+name = "biling"
 version = "0.0.1"
-description = "Prompta — Your Prompt Workspace"
+description = "biling"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [
@@ -32,7 +32,9 @@ dependencies = [
     "loguru>=0.7.3",
     "redis>=5.2.0",
     "pgvector>=0.4.2",
+    "stripe>=12.2.0",
     "tzdata>=2026.1",
+    "ipdb>=0.13.13",
 ]
 [tool.ruff]
 line-length = 120  # 代码最大行宽

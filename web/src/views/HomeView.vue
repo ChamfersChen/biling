@@ -29,14 +29,14 @@
         </div>
 
         <nav class="top-nav">
-          <button class="nav-link nav-link--button" type="button" @click="handleProtectedNav('/product-content/generate')">
+          <button class="nav-link nav-link--button" type="button" @click="handleNav('/product-content/generate')">
             产品文案
           </button>
-          <button class="nav-link nav-link--button" type="button" @click="handleProtectedNav('/extensions/prompts')">
-            提示词管理
-          </button>
-          <button class="nav-link nav-link--button" type="button" @click="handleProtectedNav('/community')">
+          <button class="nav-link nav-link--button" type="button" @click="handleNav('/community')">
             社区
+          </button>
+          <button class="nav-link nav-link--button" type="button" @click="handleNav('/extensions/prompts')">
+            提示词管理
           </button>
         </nav>
 
@@ -52,110 +52,94 @@
       <main class="home-main">
         <section class="hero-card">
           <div class="hero-copy">
-            <p class="eyebrow">统一管理提示词、社区分发与产品内容生成</p>
-            <h2 class="hero-title">从提示词资产到社区分发，再到产品文案与生图，一套界面完成协作闭环。</h2>
-            <p class="hero-subtitle">
-              {{ infoStore.branding.subtitle || '面向运营、内容和业务团队的 AI 工作台' }}
-            </p>
+            <p class="eyebrow">{{ infoStore.branding.name || 'Prompta' }}</p>
+            <h2 class="hero-title">{{ infoStore.branding.subtitle || '高效内容生成与提示词管理' }}</h2>
+            <p class="hero-subtitle">围绕产品文案生成、提示词管理与社区协作的核心能力，帮助团队快速产出高质量内容。</p>
 
             <div class="hero-actions">
-              <button class="hero-btn hero-btn--primary" @click="goToWorkspace">
+              <button class="hero-btn hero-btn--primary" @click="handlePrimaryAction">
                 {{ primaryActionLabel }}
               </button>
-            </div>
-
-            <div class="hero-metrics">
-              <div class="metric-tile" v-for="item in headlineMetrics" :key="item.label">
-                <p class="metric-value">{{ item.value }}</p>
-                <p class="metric-label">{{ item.label }}</p>
-                <p class="metric-note">{{ item.note }}</p>
-              </div>
+              <button v-if="userStore.isLoggedIn" class="hero-btn hero-btn--secondary" @click="router.push('/product-content/history')">
+                查看生成记录
+              </button>
             </div>
           </div>
 
-          <div class="hero-side">
-            <div class="workspace-preview">
-              <div class="preview-header">
-                <span class="preview-pill">当前系统能力</span>
-                <span class="preview-status">在线工作台</span>
+          <div class="hero-stats">
+            <div class="stats-card">
+              <div class="stats-item">
+                <span class="stats-num">3</span>
+                <span class="stats-label">核心能力</span>
               </div>
-
-              <div class="preview-stack">
-                <div class="preview-module preview-module--highlight">
-                  <div>
-                    <p class="module-kicker">Content Studio</p>
-                    <h3>产品文案生成</h3>
-                    <p>支持已存产品复用、结果回看、单条生图、订阅配额。</p>
-                  </div>
-                  <Sparkles :size="18" />
-                </div>
-
-                <div class="preview-grid">
-                  <div class="preview-module" v-for="module in previewModules" :key="module.title">
-                    <component :is="module.icon" :size="18" class="module-icon" />
-                    <p class="module-title">{{ module.title }}</p>
-                    <p class="module-desc">{{ module.description }}</p>
-                  </div>
-                </div>
+              <div class="stats-divider" />
+              <div class="stats-item">
+                <span class="stats-num">3</span>
+                <span class="stats-label">订阅档位</span>
+              </div>
+              <div class="stats-divider" />
+              <div class="stats-item">
+                <span class="stats-num">∞</span>
+                <span class="stats-label">使用延展</span>
               </div>
             </div>
           </div>
         </section>
 
-        <section class="section-block capability-block">
-          <div class="section-heading">
-            <p class="section-kicker">Platform</p>
-            <h3>围绕当前系统功能重新组织首页信息架构</h3>
-            <p>不只是展示产品介绍，而是把今天已经可用的功能路径直接呈现出来。</p>
-          </div>
-
-          <div class="capability-grid">
-            <article class="capability-card" v-for="item in capabilityCards" :key="item.title">
-              <div class="capability-icon">
-                <component :is="item.icon" :size="18" />
+        <section class="entry-section">
+          <h3 class="section-title">从这里开始</h3>
+          <div class="entry-grid">
+            <article class="entry-card" @click="handleNav('/product-content/generate')">
+              <div class="entry-icon" style="background: linear-gradient(135deg, #fef3c7, #fde68a);">
+                <FileText :size="22" color="#d97706" />
               </div>
-              <h4>{{ item.title }}</h4>
-              <p>{{ item.description }}</p>
-              <span>{{ item.footnote }}</span>
+              <div class="entry-body">
+                <h4>产品文案</h4>
+                <p>输入产品信息，选择风格与渠道，一键生成可用于发布的营销文案，并可直接生图。</p>
+              </div>
+              <span class="entry-arrow">
+                <ArrowRight :size="16" />
+              </span>
+            </article>
+
+            <article class="entry-card" @click="handleNav('/community')">
+              <div class="entry-icon" style="background: linear-gradient(135deg, #dbeafe, #bfdbfe);">
+                <Globe2 :size="22" color="#2563eb" />
+              </div>
+              <div class="entry-body">
+                <h4>社区</h4>
+                <p>浏览、发现和复用社区中的优质提示词与内容模板，参与交流与沉淀。</p>
+              </div>
+              <span class="entry-arrow">
+                <ArrowRight :size="16" />
+              </span>
+            </article>
+
+            <article class="entry-card" @click="handleNav('/extensions/prompts')">
+              <div class="entry-icon" style="background: linear-gradient(135deg, #d1fae5, #a7f3d0);">
+                <FolderTree :size="22" color="#059669" />
+              </div>
+              <div class="entry-body">
+                <h4>提示词管理</h4>
+                <p>管理员维护提示词资产，支持变量结构识别、测试与发布到社区。</p>
+              </div>
+              <span class="entry-arrow">
+                <ArrowRight :size="16" />
+              </span>
             </article>
           </div>
         </section>
 
-        <section class="section-block route-block">
-          <div class="section-heading">
-            <p class="section-kicker">Entry Points</p>
-            <h3>按角色进入最合适的工作入口</h3>
-            <p>管理员管理资产与结构，普通用户直接进入内容消费和生产流程。</p>
-          </div>
-
-          <div class="route-grid">
-            <article class="route-card" v-for="item in entryRoutes" :key="item.title">
-              <div class="route-top">
-                <component :is="item.icon" :size="18" />
-                <span>{{ item.tag }}</span>
-              </div>
-              <h4>{{ item.title }}</h4>
-              <p>{{ item.description }}</p>
-              <button class="route-link" @click="navigateTo(item.to)">{{ item.action }}</button>
-            </article>
-          </div>
-        </section>
-
-        <section class="section-block insight-block" v-if="featureCards.length">
-          <div class="section-heading">
-            <p class="section-kicker">Signals</p>
-            <h3>来自品牌配置的附加信息</h3>
-            <p>保留系统配置中的业务指标、亮点和说明信息。</p>
-          </div>
-
-          <div class="insight-grid">
-            <article class="insight-card" v-for="card in featureCards" :key="card.label">
-              <div class="insight-icon" v-if="card.icon">
+        <section class="info-section" v-if="featureCards.length">
+          <h3 class="section-title">系统说明</h3>
+          <div class="info-grid">
+            <article class="info-card" v-for="card in featureCards" :key="card.label">
+              <div class="info-icon" v-if="card.icon">
                 <component :is="card.icon" :size="18" />
               </div>
-              <p class="insight-value">{{ card.value || '--' }}</p>
-              <p class="insight-label">{{ card.label }}</p>
-              <p class="insight-desc">{{ card.description || '来自系统配置的补充说明' }}</p>
+              <p class="info-value">{{ card.value || '--' }}</p>
+              <p class="info-label">{{ card.label }}</p>
+              <p class="info-desc">{{ card.description }}</p>
             </article>
           </div>
         </section>
@@ -174,19 +158,13 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useInfoStore } from '@/stores/info'
 import { healthApi } from '@/apis/system_api'
-import { Result, Button, message } from 'ant-design-vue'
+import { Result, Button } from 'ant-design-vue'
 import UserInfoComponent from '@/components/UserInfoComponent.vue'
 import {
-  Sparkles,
-  Bot,
-  FolderTree,
-  Globe2,
-  Image,
+  ArrowRight,
   FileText,
-  ShieldCheck,
-  BadgeDollarSign,
-  Wand2,
-  Compass,
+  Globe2,
+  FolderTree,
   Github,
   CheckCircle2,
   GitCommit,
@@ -221,7 +199,6 @@ const checkHealth = async () => {
 const loadData = async () => {
   isLoading.value = true
   error.value = null
-
   try {
     await checkHealth()
     await infoStore.loadInfoConfig()
@@ -236,128 +213,31 @@ const retryLoad = () => {
   loadData()
 }
 
-const goToWorkspace = () => {
-  if (!userStore.isLoggedIn) {
-    sessionStorage.setItem('redirect', '/product-content/generate')
-    router.push('/login')
-    return
-  }
-
-  router.push('/product-content/generate')
-}
-
-const handleProtectedNav = (to) => {
+const handleNav = (to) => {
   if (!userStore.isLoggedIn) {
     sessionStorage.setItem('redirect', to)
     router.push('/login')
     return
   }
-
   if (to === '/extensions/prompts' && !userStore.isAdmin) {
-    message.info('提示词管理仅管理员可用，已为你打开社区')
     router.push('/community')
     return
   }
-
   router.push(to)
 }
 
-const navigateTo = (to) => {
+const handlePrimaryAction = () => {
   if (!userStore.isLoggedIn) {
-    sessionStorage.setItem('redirect', to)
+    sessionStorage.setItem('redirect', '/product-content/dashboard')
     router.push('/login')
     return
   }
-  router.push(to)
+  router.push('/product-content/dashboard')
 }
 
 const primaryActionLabel = computed(() => {
-  if (!userStore.isLoggedIn) {
-    return '登录并开始使用'
-  }
-  if (userStore.isAdmin) {
-    return '进入系统'
-  }
-  return '进入产品文案工作台'
+  return userStore.isLoggedIn ? '进入系统' : '登录并开始使用'
 })
-
-const headlineMetrics = computed(() => [
-  { label: '核心模块', value: '3', note: '提示词管理、社区、产品文案' },
-  { label: '内容链路', value: 'End-to-End', note: '从资产维护到生成、分发与复用' },
-  { label: '订阅档位', value: '3', note: 'free / pro / enterprise 配额体系' }
-])
-
-const previewModules = computed(() => [
-  { icon: FolderTree, title: '提示词管理', description: '目录树、变量识别、测试与发布到社区' },
-  { icon: Globe2, title: '社区协作', description: '分类浏览、收藏互动、内容传播与沉淀' },
-  { icon: Image, title: '图片生成', description: '基于文案结果逐条触发生图流程' }
-])
-
-const capabilityCards = computed(() => [
-  {
-    icon: Wand2,
-    title: '通用产品文案工作台',
-    description: '支持产品资料保存、风格组合、渠道适配、历史批次回看和最近结果复用。',
-    footnote: '覆盖 generate / history / subscription'
-  },
-  {
-    icon: FolderTree,
-    title: '提示词资产管理',
-    description: '通过目录树维护提示词文件、变量结构、测试结果，并可直接发布到社区。',
-    footnote: '适合管理员与运营维护知识资产'
-  },
-  {
-    icon: Globe2,
-    title: '社区分发与复用',
-    description: '社区页承担浏览、发现、筛选和内容复用能力。',
-    footnote: '把内部资产变成可共享的内容单元'
-  },
-  {
-    icon: BadgeDollarSign,
-    title: '订阅与配额治理',
-    description: '按套餐控制每日和每月使用量，支持面向业务侧的清晰容量展示。',
-    footnote: 'free / pro / enterprise'
-  },
-  {
-    icon: ShieldCheck,
-    title: '多租户与权限体系',
-    description: '复用现有 user_id、department_id 和鉴权体系，管理员与普通用户路径分离。',
-    footnote: '保持现有后端组织结构与安全边界'
-  },
-  {
-    icon: Bot,
-    title: 'AI 生成闭环',
-    description: '从 Prompt 构建、结构化结果解析，到图片生成与对象存储上传已经串联。',
-    footnote: '内容与视觉资产可连续生产'
-  }
-])
-
-const entryRoutes = computed(() => [
-  {
-    icon: FileText,
-    tag: 'Generate',
-    title: '产品文案',
-    description: '进入产品文案生成台，创建新产品、复用已存产品、查看最近结果并逐条生图。',
-    action: '打开工作台',
-    to: '/product-content/generate'
-  },
-  {
-    icon: Compass,
-    tag: 'Discover',
-    title: '社区',
-    description: '浏览社区内容、分类和文件夹视角，查看详情并参与交流。',
-    action: '浏览社区',
-    to: '/community'
-  },
-  {
-    icon: FolderTree,
-    tag: 'Admin',
-    title: '提示词管理',
-    description: '管理员可维护提示词目录、测试变量与发布状态，持续经营提示词资产。',
-    action: '管理提示词',
-    to: '/extensions/prompts'
-  }
-])
 
 const iconKey = (value) => (typeof value === 'string' ? value.toLowerCase() : '')
 
@@ -366,7 +246,7 @@ const featureIconMap = {
   issues: CheckCircle2,
   resolved: CheckCircle2,
   commits: GitCommit,
-  license: ShieldCheck,
+  license: CheckCircle2,
   default: Star
 }
 
@@ -375,14 +255,8 @@ const featureCards = computed(() => {
   return list
     .map((item) => {
       if (typeof item === 'string') {
-        return {
-          label: item,
-          value: '',
-          description: '',
-          icon: featureIconMap.default
-        }
+        return { label: item, value: '', description: '', icon: Star }
       }
-
       const key = iconKey(item.icon || item.type)
       return {
         label: item.label || item.name || '',
@@ -404,8 +278,8 @@ onMounted(() => {
   min-height: 100vh;
   color: #172033;
   background:
-    radial-gradient(circle at top left, rgba(245, 158, 11, 0.18), transparent 28%),
-    radial-gradient(circle at 88% 12%, rgba(37, 99, 235, 0.14), transparent 24%),
+    radial-gradient(circle at top left, rgba(245, 158, 11, 0.14), transparent 26%),
+    radial-gradient(circle at 88% 10%, rgba(37, 99, 235, 0.12), transparent 22%),
     linear-gradient(180deg, #fff9f2, #eef6ff 42%, #f9fbff 100%);
 }
 
@@ -436,7 +310,7 @@ onMounted(() => {
   justify-content: space-between;
   gap: 16px;
   padding: 18px 28px;
-  background: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.44);
   border-bottom: 1px solid rgba(255, 255, 255, 0.56);
   backdrop-filter: blur(18px);
 }
@@ -457,7 +331,7 @@ onMounted(() => {
 .brand-kicker {
   margin: 0 0 2px;
   font-size: 11px;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #60708a;
 }
@@ -473,7 +347,6 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
 }
 
 .nav-link,
@@ -487,7 +360,7 @@ onMounted(() => {
   color: #42526b;
   text-decoration: none;
   background: rgba(255, 255, 255, 0.46);
-  border: 1px solid rgba(37, 99, 235, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.56);
   transition: all 0.2s ease;
 }
 
@@ -511,32 +384,34 @@ onMounted(() => {
 }
 
 .home-main {
-  width: min(1280px, calc(100% - 32px));
+  width: min(1100px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 28px 0 48px;
+  padding: 32px 0 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .hero-card,
-.section-block,
-.overview-panel {
-  border-radius: 30px;
+.entry-section,
+.info-section {
+  border-radius: 28px;
   background: rgba(255, 255, 255, 0.38);
   border: 1px solid rgba(255, 255, 255, 0.56);
-  box-shadow: 0 24px 52px rgba(27, 52, 92, 0.12);
+  box-shadow: 0 24px 52px rgba(27, 52, 92, 0.1);
   backdrop-filter: blur(18px);
 }
 
 .hero-card {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.6fr);
   gap: 28px;
-  padding: 34px;
+  padding: 36px;
+  align-items: center;
 }
 
-.eyebrow,
-.section-kicker,
-.module-kicker {
-  margin: 0;
+.eyebrow {
+  margin: 0 0 12px;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -544,24 +419,18 @@ onMounted(() => {
   color: #d97706;
 }
 
-.hero-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
 .hero-title {
-  margin: 0;
-  font-size: clamp(36px, 5vw, 62px);
-  line-height: 1.05;
-  letter-spacing: -0.04em;
+  margin: 0 0 16px;
+  font-size: clamp(30px, 4vw, 48px);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
   color: #172033;
 }
 
 .hero-subtitle {
-  margin: 0;
-  max-width: 760px;
-  font-size: 18px;
+  margin: 0 0 24px;
+  max-width: 600px;
+  font-size: 16px;
   line-height: 1.7;
   color: #4b5d79;
 }
@@ -574,7 +443,7 @@ onMounted(() => {
 
 .hero-btn {
   min-height: 48px;
-  padding: 0 20px;
+  padding: 0 24px;
   border-radius: 999px;
   border: 1px solid transparent;
   font-size: 15px;
@@ -603,239 +472,159 @@ onMounted(() => {
   }
 }
 
-.hero-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 8px;
+.stats-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.3));
+  border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
-.metric-tile,
-.preview-module,
-.capability-card,
-.route-card,
-.insight-card {
+.stats-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.stats-num {
+  font-size: 32px;
+  font-weight: 800;
+  color: #172033;
+}
+
+.stats-label {
+  font-size: 12px;
+  color: #60708a;
+}
+
+.stats-divider {
+  width: 1px;
+  height: 40px;
+  background: rgba(148, 163, 184, 0.24);
+}
+
+.entry-section,
+.info-section {
+  padding: 28px 32px;
+}
+
+.section-title {
+  margin: 0 0 20px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #172033;
+}
+
+.entry-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.entry-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.entry-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 36px rgba(27, 52, 92, 0.14);
+}
+
+.entry-icon {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+}
+
+.entry-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.entry-body h4 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #172033;
+}
+
+.entry-body p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #60708a;
+}
+
+.entry-arrow {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.6);
+  color: #60708a;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.info-card {
+  padding: 20px;
+  border-radius: 20px;
   background: rgba(255, 255, 255, 0.34);
   border: 1px solid rgba(255, 255, 255, 0.52);
   backdrop-filter: blur(12px);
 }
 
-.metric-tile {
-  padding: 18px;
-  border-radius: 22px;
+.info-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+  margin-bottom: 12px;
 }
 
-.metric-value {
-  margin: 0 0 6px;
-  font-size: 24px;
+.info-value {
+  margin: 0 0 4px;
+  font-size: 26px;
   font-weight: 800;
   color: #172033;
 }
 
-.metric-label {
+.info-label {
   margin: 0 0 6px;
   font-size: 14px;
   font-weight: 700;
   color: #2d3d57;
 }
 
-.metric-note {
+.info-desc {
   margin: 0;
   font-size: 13px;
   line-height: 1.55;
   color: #60708a;
-}
-
-.hero-side,
-.workspace-preview,
-.preview-stack {
-  display: flex;
-  flex-direction: column;
-}
-
-.workspace-preview {
-  height: 100%;
-  padding: 22px;
-  border-radius: 26px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.46), rgba(255, 255, 255, 0.24));
-  border: 1px solid rgba(255, 255, 255, 0.58);
-}
-
-.preview-header,
-.route-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.preview-pill,
-.preview-status,
-.route-top span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 0 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.preview-pill {
-  color: #2563eb;
-  background: rgba(37, 99, 235, 0.08);
-}
-
-.preview-status,
-.route-top span {
-  color: #b45309;
-  background: rgba(217, 119, 6, 0.1);
-}
-
-.preview-stack {
-  gap: 12px;
-  margin-top: 18px;
-}
-
-.preview-module {
-  padding: 16px;
-  border-radius: 20px;
-}
-
-.preview-module--highlight {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  background: linear-gradient(135deg, rgba(217, 119, 6, 0.12), rgba(37, 99, 235, 0.12));
-}
-
-.preview-module h3,
-.module-title,
-.capability-card h4,
-.route-card h4 {
-  margin: 6px 0 8px;
-  color: #172033;
-}
-
-.preview-module p,
-.module-desc,
-.capability-card p,
-.route-card p,
-.insight-desc,
-.section-heading p {
-  margin: 0;
-  color: #60708a;
-  line-height: 1.65;
-}
-
-.preview-grid,
-.capability-grid,
-.route-grid,
-.insight-grid {
-  display: grid;
-  gap: 14px;
-}
-
-.preview-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.module-icon,
-.capability-icon {
-  color: #2563eb;
-}
-
-.module-title {
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.module-desc {
-  font-size: 13px;
-}
-
-.section-block,
-.overview-panel {
-  margin-top: 18px;
-  padding: 28px;
-}
-
-.section-heading {
-  max-width: 720px;
-  margin-bottom: 18px;
-}
-
-.section-heading h3 {
-  margin: 8px 0 10px;
-  font-size: 28px;
-  color: #172033;
-}
-
-.capability-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.capability-card,
-.route-card,
-.insight-card {
-  padding: 20px;
-  border-radius: 24px;
-}
-
-.capability-card span {
-  display: inline-block;
-  margin-top: 12px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #2563eb;
-}
-
-.route-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.route-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.route-link {
-  align-self: flex-start;
-  border: none;
-  background: transparent;
-  padding: 0;
-  color: #2563eb;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.insight-grid {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
-
-.insight-icon {
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 14px;
-  background: rgba(37, 99, 235, 0.08);
-  color: #2563eb;
-}
-
-.insight-value {
-  margin: 12px 0 6px;
-  font-size: 28px;
-  font-weight: 800;
-  color: #172033;
-}
-
-.insight-label {
-  margin: 0 0 6px;
-  font-size: 15px;
-  font-weight: 700;
-  color: #2d3d57;
 }
 
 .site-footer {
@@ -848,15 +637,16 @@ onMounted(() => {
   color: #60708a;
 }
 
-@media (max-width: 1120px) {
-  .hero-card,
-  .capability-grid,
-  .route-grid {
+@media (max-width: 1024px) {
+  .hero-card {
     grid-template-columns: 1fr;
   }
 
-  .hero-metrics,
-  .preview-grid {
+  .stats-card {
+    justify-content: center;
+  }
+
+  .entry-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -867,27 +657,27 @@ onMounted(() => {
     flex-direction: column;
     align-items: stretch;
     padding: 16px;
+    gap: 12px;
   }
 
-  .top-nav,
+  .top-nav {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
   .header-actions {
     justify-content: center;
   }
 
   .home-main {
-    width: calc(100% - 20px);
-    padding: 10px 0 24px;
+    padding: 16px 0 40px;
   }
 
   .hero-card,
-  .section-block,
-  .overview-panel {
-    padding: 18px;
-    border-radius: 24px;
-  }
-
-  .hero-title {
-    font-size: 34px;
+  .entry-section,
+  .info-section {
+    padding: 20px;
+    border-radius: 22px;
   }
 }
 </style>

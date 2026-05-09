@@ -45,7 +45,7 @@ class Config(BaseModel):
     # 模型配置
     # ============================================================
     default_model: str = Field(
-        default="siliconflow/Qwen/Qwen3.5-9B",
+        default="siliconflow/Qwen/Qwen3-8B",
         description="默认对话模型",
     )
     fast_model: str = Field(
@@ -69,6 +69,12 @@ class Config(BaseModel):
     # 智能体配置
     # ============================================================
     default_agent_id: str = Field(default="ChatbotAgent", description="默认智能体ID")
+
+    # ============================================================
+    # 支付配置
+    # ============================================================
+    stripe_secret_key: str = Field(default="", description="Stripe Secret Key")
+    stripe_webhook_secret: str = Field(default="", description="Stripe Webhook Secret")
 
     # ============================================================
     # 模型信息（只读，不持久化）

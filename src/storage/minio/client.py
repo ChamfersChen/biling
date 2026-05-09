@@ -41,7 +41,7 @@ class MinIOClient:
     简化的 MinIO 客户端类
     """
 
-    PUBLIC_READ_BUCKETS = {"generated-images", "avatar", "kb-images"}
+    PUBLIC_READ_BUCKETS = {"generated-images", "avatar", "kb-images", "product-images"}
 
     # 知识库相关的 bucket 名称
     KB_BUCKETS = {

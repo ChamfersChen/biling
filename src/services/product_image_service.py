@@ -22,6 +22,7 @@ class ProductImageService:
             raise ValueError("图片生成功能未配置，请先设置 OPENAI_API_KEY")
 
         client = AsyncOpenAI(api_key=self._api_key, base_url=self._base_url)
+        import ipdb; ipdb.set_trace()
         response = await client.images.generate(model=self._model, prompt=prompt, size=size)
 
         data = getattr(response, "data", None) or []

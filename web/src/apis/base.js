@@ -251,6 +251,19 @@ export function apiDelete(url, options = {}, requiresAuth = true, responseType =
   return apiRequest(url, { method: 'DELETE', ...options }, requiresAuth, responseType)
 }
 
+export function apiPatch(url, data = {}, options = {}, requiresAuth = true, responseType = 'json') {
+  return apiRequest(
+    url,
+    {
+      method: 'PATCH',
+      body: data instanceof FormData ? data : JSON.stringify(data),
+      ...options
+    },
+    requiresAuth,
+    responseType
+  )
+}
+
 export function apiAdminDelete(url, options = {}) {
   checkAdminPermission()
   return apiDelete(url, options, true)

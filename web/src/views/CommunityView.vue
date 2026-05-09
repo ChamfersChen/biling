@@ -1,289 +1,180 @@
 <template>
   <div class="community-view">
-    <div class="community-header">
-      <div class="header-right">
-        <a-input-search
-          v-model:value="searchKeyword"
-          placeholder="搜索..."
-          style="width: 280px"
-          @search="handleSearch"
-          @change="handleSearchChange"
-          allowClear
+    <div class="community-top">
+      <div class="community-top__main">
+        <span class="top-kicker">Community</span>
+        <h1>社区</h1>
+        <p>浏览精选提示词与内容模板，发现可复用的优质资产。</p>
+      </div>
+      <a-input-search
+        v-model:value="searchKeyword"
+        placeholder="搜索提示词、描述或标签..."
+        style="width: 300px"
+        @search="handleSearch"
+        allowClear
+      />
+    </div>
+
+    <div class="community-tabs">
+      <a-button :type="selectedTab[0] === 'prompts' ? 'primary' : 'default'" @click="switchTab('prompts')">
+        <BookText :size="16" />
+        提示词社区
+      </a-button>
+      <a-button :type="selectedTab[0] === 'favorites' ? 'primary' : 'default'" @click="switchTab('favorites')">
+        <Heart :size="16" />
+        我的收藏
+      </a-button>
+    </div>
+
+    <div class="community-bar" v-if="selectedTab[0] !== 'favorites'">
+      <a-radio-group v-model:value="sortBy" size="small" @change="handleSortChange">
+        <a-radio-button value="popular">热门</a-radio-button>
+        <a-radio-button value="latest">最新</a-radio-button>
+        <a-radio-button value="rating">评分</a-radio-button>
+      </a-radio-group>
+      <div class="bar-categories">
+        <a-tag v-for="cat in categories" :key="cat.key" :color="currentCategory === cat.key ? 'blue' : undefined" style="cursor:pointer" @click="handleCategoryChange(cat.key)">{{ cat.name }}</a-tag>
+      </div>
+      <span class="bar-count">共 {{ totalCount }} 个</span>
+    </div>
+
+    <div class="community-bar" v-if="selectedTab[0] === 'favorites'">
+      <a-button size="small" type="dashed" @click="openCreateFolderModal">+ 新建收藏夹</a-button>
+      <div class="favorite-folder-toolbar">
+        <a-select
+          v-model:value="favoriteFolder"
+          class="favorite-folder-select"
+          placeholder="选择收藏夹"
+          allow-clear
+          show-search
+          :filter-option="filterFolderOption"
+          :options="favoriteFolderSelectOptions"
         />
+        <a-button size="small" @click="openFolderManagerModal">管理收藏夹</a-button>
       </div>
     </div>
 
-    <div class="community-content">
-      <div class="sidebar">
-        <div class="sidebar-section">
-          <div class="section-title">浏览</div>
-          <a-menu
-            v-model:selectedKeys="selectedTab"
-            mode="inline"
-            class="community-menu"
-          >
-            <a-menu-item key="prompts">
-              <BookText :size="18" />
-              <span> 提示词社区</span>
-            </a-menu-item>
-            <a-menu-item key="favorites">
-              <Heart :size="18" />
-              <span> 我的收藏</span>
-            </a-menu-item>
-          </a-menu>
-        </div>
+    <div class="community-list" v-if="!loading && currentList.length > 0">
+      <community-card
+        v-for="item in currentList"
+        :key="item.id"
+        :template="item"
+        :favorited="isFavorited(item.id)"
+        :mode="selectedTab[0]"
+        @click="handleTemplateClick(item)"
+        @favorite="handleFavoriteClick(item)"
+        @fork="handleFork(item)"
+      />
+    </div>
 
-        <div class="sidebar-section" v-if="selectedTab[0] !== 'favorites'">
-          <div class="section-title">分类筛选</div>
-          <div class="category-list">
-            <div
-              v-for="cat in categories"
-              :key="cat.key"
-              class="category-item"
-              :class="{ active: currentCategory === cat.key }"
-              @click="handleCategoryChange(cat.key)"
-            >
-              <component :is="cat.icon" :size="16" />
-              <span>{{ cat.name }}</span>
+    <a-empty v-else-if="!loading" description="暂无内容" class="empty-state" />
+    <div v-if="loading" class="loading-state"><a-spin size="large" /></div>
+
+    <div class="community-pagination" v-if="totalCount > pageSize">
+      <a-pagination v-model:current="currentPage" :total="totalCount" :pageSize="pageSize" @change="handlePageChange" showQuickJumper />
+    </div>
+
+    <a-modal v-model:open="showDetailModal" :title="selectedTemplate?.name || '提示词详情'" :width="920" :footer="null" class="detail-modal">
+      <div v-if="detailLoading" class="detail-loading"><a-spin /></div>
+      <div v-else class="detail-body">
+        <div class="detail-meta-card">
+          <div class="detail-meta-card__head">
+            <div class="detail-meta-card__tags">
+              <a-tag color="blue">提示词</a-tag>
+              <a-tag :color="getCategoryColor(selectedTemplate?.category)">{{ getCategoryName(selectedTemplate?.category) }}</a-tag>
+              <a-tag v-if="selectedTemplate?.is_official" color="gold">官方</a-tag>
             </div>
-          </div>
-        </div>
-
-        <div class="sidebar-section" v-if="selectedTab[0] === 'favorites'">
-          <div class="section-title">收藏夹</div>
-          <div class="folder-panel">
-            <a-button class="btn-outline-primary" type="dashed" size="small" block @click="openCreateFolderModal">
-              新建收藏夹
+            <a-button type="primary" size="small" @click="copyTemplateContent" :disabled="!selectedTemplate?.content">
+              <Copy :size="14" />
+              复制文案
             </a-button>
-            <div class="folder-list">
-              <div
-                v-for="folder in availableFavoriteFolders"
-                :key="folder"
-                class="folder-item"
-                :class="{ active: favoriteFolder === folder }"
-                @click="favoriteFolder = folder"
-              >
-                <div class="folder-main">
-                  <Folder :size="16" />
-                  <span class="folder-name" :title="folder">{{ folder }}</span>
-                </div>
-                <div class="folder-actions">
-                  <a-dropdown :trigger="['click']" placement="bottomRight">
-                    <button class="folder-more" type="button" @click.stop>
-                      <MoreHorizontal :size="13" />
-                    </button>
-                    <template #overlay>
-                      <a-menu @click="({ key }) => handleFolderMenuClick(folder, key)">
-                        <a-menu-item key="rename">改名</a-menu-item>
-                        <a-menu-item key="delete" danger>删除</a-menu-item>
-                      </a-menu>
-                    </template>
-                  </a-dropdown>
-                </div>
-              </div>
-              <div v-if="availableFavoriteFolders.length === 0" class="folder-empty">
-                还没有收藏夹，先新建一个吧
-              </div>
-            </div>
           </div>
-        </div>
-      </div>
 
-      <div class="main-content">
-        <div class="content-header" v-if="selectedTab[0] !== 'favorites'">
-          <div class="sort-options">
-            <a-radio-group v-model:value="sortBy" size="small" @change="handleSortChange">
-              <a-radio-button value="popular">热门</a-radio-button>
-              <a-radio-button value="latest">最新</a-radio-button>
-              <a-radio-button value="rating">评分</a-radio-button>
-            </a-radio-group>
-          </div>
-          <div class="template-count">共 {{ totalCount }} 个</div>
-        </div>
+          <p class="detail-description">{{ selectedTemplate?.description || '暂无描述' }}</p>
 
-        <div class="template-grid" v-if="!loading && currentList.length > 0">
-          <community-card
-            v-for="item in currentList"
-            :key="item.id"
-            :template="item"
-            :favorited="isFavorited(item.id)"
-            :mode="selectedTab[0]"
-            @click="handleTemplateClick(item)"
-            @favorite="handleFavoriteClick(item)"
-            @fork="handleFork(item)"
-          />
-        </div>
-
-        <div class="empty-state" v-else-if="!loading">
-          <Inbox :size="48" />
-          <p>暂无内容</p>
-        </div>
-
-        <div class="loading-state" v-if="loading">
-          <a-spin size="large" />
-        </div>
-
-        <div class="pagination" v-if="totalCount > pageSize">
-          <a-pagination
-            v-model:current="currentPage"
-            :total="totalCount"
-            :pageSize="pageSize"
-            @change="handlePageChange"
-            showQuickJumper
-          />
-        </div>
-      </div>
-    </div>
-
-    <a-modal
-      v-model:open="showDetailModal"
-      :title="selectedTemplate?.name"
-      :width="960"
-      :footer="null"
-      :bodyStyle="{ height: '620px', overflow: 'hidden' }"
-      class="template-detail-modal"
-    >
-      <div class="detail-content">
-        <div class="detail-layout">
-          <div class="detail-preview">
-            <div class="preview-header">
-              <h4>预览</h4>
-              <a-button class="btn-primary-solid" type="primary" size="small" @click="copyTemplateContent">
-                <Copy :size="14" />
-                复制提示词
-              </a-button>
+          <div class="detail-facts">
+            <div class="detail-fact">
+              <span class="detail-fact__label">作者</span>
+              <span class="detail-fact__value">{{ selectedTemplate?.author || '匿名' }}</span>
             </div>
-            <div class="preview-content">
-              <pre>{{ selectedTemplate?.content }}</pre>
+            <div class="detail-fact">
+              <span class="detail-fact__label">发布时间</span>
+              <span class="detail-fact__value">{{ selectedTemplate?.created_at || '-' }}</span>
+            </div>
+            <div class="detail-fact" v-if="selectedTemplate?.department_name">
+              <span class="detail-fact__label">来源部门</span>
+              <span class="detail-fact__value">{{ selectedTemplate.department_name }}</span>
+            </div>
+            <div class="detail-fact">
+              <span class="detail-fact__label">评分</span>
+              <span class="detail-fact__value">{{ selectedTemplate?.rating?.toFixed?.(1) || '0.0' }}</span>
             </div>
           </div>
 
-          <div class="detail-info">
-            <div class="detail-header">
-              <div class="detail-meta">
-                <a-tag :color="getCategoryColor(selectedTemplate?.category)">
-                  {{ getCategoryName(selectedTemplate?.category) }}
-                </a-tag>
-                <a-tag color="blue">提示词</a-tag>
-                <span class="author">作者: {{ selectedTemplate?.author }}</span>
-                <span v-if="selectedTemplate?.department_name" class="dept-tag">
-                  {{ selectedTemplate.department_name }}
-                </span>
-              </div>
-            </div>
-
-            <div class="detail-description">
-              <h4>描述</h4>
-              <p>{{ selectedTemplate?.description || '暂无描述' }}</p>
-            </div>
-
-            <div class="detail-rating" v-if="selectedTab[0] !== 'favorites'">
-              <h4>评分</h4>
-              <div class="my-rating">
-                <a-rate v-model:value="myRating" @change="handleRate(selectedTemplate)" />
-              </div>
-            </div>
-
-            <div class="detail-variables" v-if="selectedTemplate?.variables?.length">
-              <h4>变量</h4>
-              <div class="variable-tags">
-                <a-tag v-for="v in selectedTemplate.variables" :key="v.name" color="blue">
-                  {{ v.name }}
-                  <span v-if="v.default">: {{ v.default }}</span>
-                </a-tag>
-              </div>
-            </div>
-
-            <div class="detail-tags" v-if="selectedTemplate?.tags?.length">
-              <h4>标签</h4>
-              <div class="variable-tags">
-                <a-tag v-for="tag in selectedTemplate.tags" :key="tag">{{ tag }}</a-tag>
-              </div>
-            </div>
-
-            <div class="detail-comments" v-if="selectedTab[0] !== 'favorites'">
-              <h4>评论</h4>
-              <div class="comment-list">
-                <div class="comment-item" v-for="comment in comments" :key="comment.id">
-                  <div class="comment-avatar">
-                    <a-avatar :size="28">{{ comment.author?.charAt(0) }}</a-avatar>
-                  </div>
-                  <div class="comment-content">
-                    <div class="comment-header">
-                      <span class="comment-author">{{ comment.author }}</span>
-                      <span class="comment-time">{{ comment.createdAt }}</span>
-                    </div>
-                    <p class="comment-text">{{ comment.content }}</p>
-                  </div>
-                </div>
-              </div>
-              <div class="comment-input">
-                <a-input
-                  v-model:value="newComment"
-                  placeholder="发表你的看法..."
-                  @pressEnter="handleComment"
-                />
-                <a-button class="btn-primary-solid" type="primary" size="small" @click="handleComment">评论</a-button>
-              </div>
+          <div v-if="selectedTemplate?.variables?.length" class="detail-section">
+            <strong>变量</strong>
+            <div class="detail-tags">
+              <a-tag v-for="v in selectedTemplate.variables" :key="v.name" color="blue">{{ v.name }}{{ v.default ? `: ${v.default}` : '' }}</a-tag>
             </div>
           </div>
+
+          <div v-if="selectedTemplate?.tags?.length" class="detail-section">
+            <strong>标签</strong>
+            <div class="detail-tags">
+              <a-tag v-for="tag in selectedTemplate.tags" :key="tag">{{ tag }}</a-tag>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-preview">
+          <div class="detail-preview__head">
+            <h4>提示词文案</h4>
+            <span class="detail-preview__hint">点击复制后可直接复用</span>
+          </div>
+          <pre v-if="selectedTemplate?.content">{{ selectedTemplate.content }}</pre>
+          <div v-else class="detail-empty">暂无提示词文案</div>
         </div>
       </div>
     </a-modal>
 
-    <a-modal
-      v-model:open="showFavoriteModal"
-      title="收藏"
-      @ok="confirmFavorite"
-      :confirm-loading="favoriting"
-    >
-      <p>选择收藏夹：</p>
+    <a-modal v-model:open="showFavoriteModal" title="收藏" @ok="confirmFavorite" :confirm-loading="favoriting">
       <a-form layout="vertical">
         <a-form-item label="收藏夹">
-          <a-auto-complete
-            v-model:value="favoriteForm.folderPath"
-            :options="favoriteFolderOptions"
-            placeholder="可选择或输入新的收藏夹"
-            allow-clear
-            style="width: 100%"
-          />
-          <div class="folder-tip">可直接输入名称创建新收藏夹</div>
+          <a-auto-complete v-model:value="favoriteForm.folderPath" :options="favoriteFolderOptions" placeholder="选择或输入新收藏夹" allow-clear style="width:100%" />
         </a-form-item>
       </a-form>
     </a-modal>
 
-    <a-modal
-      v-model:open="showCreateFolderModal"
-      title="新建收藏夹"
-      @ok="confirmCreateFolder"
-      :confirm-loading="creatingFolder"
-    >
+    <a-modal v-model:open="showCreateFolderModal" :title="renameTarget ? '重命名收藏夹' : '新建收藏夹'" @ok="handleConfirmFolder" :confirm-loading="creatingFolder" @cancel="renameTarget = ''">
       <a-form layout="vertical">
-        <a-form-item label="收藏夹名称" required>
-          <a-input
-            v-model:value="newFolderName"
-            placeholder="例如：常用提示词"
-            @pressEnter="confirmCreateFolder"
-          />
+        <a-form-item label="名称">
+          <a-input v-model:value="newFolderName" :placeholder="renameTarget || '常用提示词'" @pressEnter="handleConfirmFolder" />
         </a-form-item>
       </a-form>
     </a-modal>
 
-    <a-modal
-      v-model:open="showRenameFolderModal"
-      title="重命名收藏夹"
-      @ok="confirmRenameFolder"
-      :confirm-loading="renamingFolder"
-    >
-      <a-form layout="vertical">
-        <a-form-item label="新名称" required>
-          <a-input
-            v-model:value="renameFolderName"
-            placeholder="请输入新的收藏夹名称"
-            @pressEnter="confirmRenameFolder"
-          />
-        </a-form-item>
-      </a-form>
+    <a-modal v-model:open="showFolderManagerModal" title="管理收藏夹" :footer="null" width="560">
+      <div class="folder-manager">
+        <a-input-search
+          v-model:value="folderManagerKeyword"
+          placeholder="搜索收藏夹"
+          allow-clear
+          class="folder-manager__search"
+        />
+        <div v-if="filteredFavoriteFolders.length" class="folder-manager__list">
+          <div v-for="folder in filteredFavoriteFolders" :key="folder" class="folder-manager__item">
+            <button class="folder-manager__name" type="button" @click="selectFavoriteFolder(folder)">
+              <span>{{ folder }}</span>
+              <span v-if="favoriteFolder === folder" class="folder-manager__active">当前使用</span>
+            </button>
+            <div class="folder-manager__actions">
+              <a-button size="small" type="text" @click="openRenameFolderModal(folder)">重命名</a-button>
+              <a-button size="small" type="text" danger @click="handleDeleteFolder(folder)">删除</a-button>
+            </div>
+          </div>
+        </div>
+        <a-empty v-else description="没有匹配的收藏夹" />
+      </div>
     </a-modal>
   </div>
 </template>
@@ -291,26 +182,14 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import {
-  BookText,
-  Heart,
-  Folder,
-  Copy,
-  MoreHorizontal,
-  Inbox,
-  FileText,
-  Code,
-  BarChart,
-  Globe,
-  Briefcase,
-  GraduationCap,
-  Megaphone
-} from 'lucide-vue-next'
+import { BookText, Heart, Copy, FileText, Code, BarChart, Globe, Briefcase, GraduationCap, Megaphone } from 'lucide-vue-next'
 import CommunityCard from '@/components/CommunityCard.vue'
 import { useCommunityStore } from '@/stores/communityStore'
+import { useUserStore } from '@/stores/user'
 import * as communityApi from '@/apis/community_api'
 
 const store = useCommunityStore()
+const userStore = useUserStore()
 
 const selectedTab = ref(['prompts'])
 const currentCategory = ref('all')
@@ -321,41 +200,27 @@ const pageSize = ref(20)
 const totalCount = ref(0)
 const loading = ref(false)
 const showDetailModal = ref(false)
+const detailLoading = ref(false)
 const showFavoriteModal = ref(false)
 const selectedTemplate = ref(null)
 const favoriting = ref(false)
-const comments = ref([])
-const newComment = ref('')
-const myRating = ref(0)
 const favoriteFolder = ref('')
 const showCreateFolderModal = ref(false)
 const creatingFolder = ref(false)
 const newFolderName = ref('')
-const showRenameFolderModal = ref(false)
-const renamingFolder = ref(false)
-const renameSourceFolder = ref('')
-const renameFolderName = ref('')
+const renameTarget = ref('')
+const showFolderManagerModal = ref(false)
+const folderManagerKeyword = ref('')
+const favoriteForm = ref({ folderPath: '' })
 
-const favoriteForm = ref({
-  folderPath: ''
-})
+const availableFavoriteFolders = computed(() => Array.from(new Set((store.favoriteFolders || []).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'zh-CN')))
 
-const availableFavoriteFolders = computed(() => {
-  const serverFolders = store.favoriteFolders || []
-  return Array.from(new Set(serverFolders.filter(Boolean))).sort((a, b) => a.localeCompare(b, 'zh-CN'))
-})
-
-const folderCountMap = computed(() => {
-  const map = new Map()
-  for (const item of store.favorites || []) {
-    const key = item._favorite_folder || ''
-    map.set(key, (map.get(key) || 0) + 1)
-  }
-  return map
-})
-
-const favoriteFolderOptions = computed(() => {
-  return availableFavoriteFolders.value.map(folder => ({ value: folder }))
+const favoriteFolderOptions = computed(() => availableFavoriteFolders.value.map(f => ({ value: f })))
+const favoriteFolderSelectOptions = computed(() => [{ label: '全部收藏', value: '' }, ...availableFavoriteFolders.value.map(folder => ({ label: folder, value: folder }))])
+const filteredFavoriteFolders = computed(() => {
+  const keyword = folderManagerKeyword.value.trim().toLowerCase()
+  if (!keyword) return availableFavoriteFolders.value
+  return availableFavoriteFolders.value.filter(folder => folder.toLowerCase().includes(keyword))
 })
 
 const categories = [
@@ -374,171 +239,76 @@ const currentList = computed(() => {
   if (tab === 'prompts') return store.promptTemplates
   if (tab === 'favorites') {
     let items = store.favorites
-    if (favoriteFolder.value) {
-      items = items.filter(t => t._favorite_folder === favoriteFolder.value)
-    }
+    if (favoriteFolder.value) items = items.filter(t => t._favorite_folder === favoriteFolder.value)
     return items
   }
   return []
 })
 
-onMounted(() => {
-  loadData()
-  store.fetchFavoriteFolders('prompt')
-})
+const switchTab = (tab) => { selectedTab.value = [tab]; favoriteFolder.value = '' }
 
-watch([selectedTab, currentCategory, sortBy], () => {
-  currentPage.value = 1
-  loadData()
-})
+onMounted(() => { loadData(); store.fetchFavoriteFolders('prompt') })
+watch([selectedTab, currentCategory, sortBy], () => { currentPage.value = 1; loadData() })
 
 const loadData = async () => {
   loading.value = true
   try {
-    const params = {
-      page: currentPage.value,
-      pageSize: pageSize.value,
-      category: currentCategory.value === 'all' ? undefined : currentCategory.value,
-      keyword: searchKeyword.value || undefined,
-      sort: sortBy.value
-    }
-
-    const tab = selectedTab.value[0]
-
-    if (tab === 'prompts') {
-      await communityApi.getFavorites().then(data => {
-        store.favorites = data.list || []
-      })
+    const params = { page: currentPage.value, pageSize: pageSize.value, category: currentCategory.value === 'all' ? undefined : currentCategory.value, keyword: searchKeyword.value || undefined, sort: sortBy.value }
+    if (selectedTab.value[0] === 'prompts') {
+      await communityApi.getFavorites().then(data => { store.favorites = data.list || [] })
       const data = await communityApi.getPromptTemplates(params)
       store.promptTemplates = data.list || []
       totalCount.value = data.total || 0
-    } else if (tab === 'favorites') {
+    } else if (selectedTab.value[0] === 'favorites') {
       await store.fetchFavorites('prompt')
       totalCount.value = store.favorites.length
     }
-  } catch {
-    message.error('加载失败')
-  } finally {
-    loading.value = false
-  }
+  } catch { message.error('加载失败') }
+  finally { loading.value = false }
 }
 
-const openCreateFolderModal = () => {
-  showCreateFolderModal.value = true
-}
-
-const handleFolderMenuClick = (folder, action) => {
-  if (action === 'rename') {
-    renameSourceFolder.value = folder
-    renameFolderName.value = folder
-    showRenameFolderModal.value = true
-    return
-  }
-  if (action === 'delete') {
-    handleDeleteFolder(folder)
-  }
-}
-
-const handleDeleteFolder = (folder) => {
-  Modal.confirm({
-    title: '删除收藏夹',
-    content: `删除收藏夹「${folder}」后，原收藏项会保留但不再归属该收藏夹，是否继续？`,
-    okText: '删除',
-    cancelText: '取消',
-    okType: 'danger',
-    async onOk() {
-      await communityApi.deleteFavoriteFolder({ folder_name: folder, item_type: 'prompt' })
-      await store.fetchFavorites('prompt')
-      await store.fetchFavoriteFolders('prompt')
-      if (favoriteFolder.value === folder) favoriteFolder.value = ''
-      if (selectedTab.value[0] === 'favorites') totalCount.value = store.favorites.length
-      message.success('收藏夹已删除')
-    }
-  })
-}
-
-const confirmRenameFolder = async () => {
-  const oldName = (renameSourceFolder.value || '').trim()
-  const newName = (renameFolderName.value || '').trim()
-
-  if (!oldName) {
-    message.warning('未找到要重命名的收藏夹')
-    return
-  }
-  if (!newName) {
-    message.warning('请输入新的收藏夹名称')
-    return
-  }
-  if (newName === oldName) {
-    showRenameFolderModal.value = false
-    return
-  }
-  if (availableFavoriteFolders.value.includes(newName)) {
-    message.warning('收藏夹已存在')
-    return
-  }
-
-  renamingFolder.value = true
-  try {
-    await communityApi.renameFavoriteFolder({
-      old_folder_path: oldName,
-      new_folder_path: newName,
-      item_type: 'prompt'
-    })
-
-    await store.fetchFavorites('prompt')
-    await store.fetchFavoriteFolders('prompt')
-
-    if (favoriteFolder.value === oldName) {
-      favoriteFolder.value = newName
-    }
-    if (selectedTab.value[0] === 'favorites') totalCount.value = store.favorites.length
-
-    showRenameFolderModal.value = false
-    renameSourceFolder.value = ''
-    renameFolderName.value = ''
-    message.success('收藏夹已重命名')
-  } catch {
-    message.error('重命名失败')
-  } finally {
-    renamingFolder.value = false
-  }
-}
-
-const handleSearch = () => { loadData() }
-const handleSearchChange = () => { if (!searchKeyword.value) loadData() }
-const handleCategoryChange = (cat) => { currentCategory.value = cat }
-const handleSortChange = () => { loadData() }
+const handleSearch = () => { currentPage.value = 1; loadData() }
+const handleSortChange = () => { currentPage.value = 1; loadData() }
+const handleCategoryChange = (cat) => { currentCategory.value = cat; currentPage.value = 1; loadData() }
 const handlePageChange = (page) => { currentPage.value = page; loadData() }
+const filterFolderOption = (input, option) => String(option?.label || '').toLowerCase().includes(String(input || '').toLowerCase())
 
-const handleTemplateClick = async (template) => {
+const isFavorited = (id) => (store.favorites || []).some(t => String(t.id) === String(id))
+const handleTemplateClick = async (item) => {
+  selectedTemplate.value = item
+  showDetailModal.value = true
+  detailLoading.value = true
   try {
-    const detail = await communityApi.getTemplateDetail(template.id)
-    selectedTemplate.value = detail
-    showDetailModal.value = true
-
-    try {
-      const data = await communityApi.getMyRating(template.id)
-      myRating.value = data ? data.rating : 0
-    } catch { myRating.value = 0 }
-
-    try {
-      const commentData = await communityApi.getTemplateComments(template.id)
-      comments.value = commentData.list || []
-    } catch { comments.value = [] }
+    const detail = await communityApi.getTemplateDetail(item.id)
+    selectedTemplate.value = { ...item, ...detail }
   } catch {
-    message.error('获取详情失败')
+    message.error('加载提示词详情失败')
+  } finally {
+    detailLoading.value = false
   }
 }
+const copyTemplateContent = async () => {
+  if (selectedTemplate.value?.content) { await navigator.clipboard.writeText(selectedTemplate.value.content); message.success('已复制') }
+}
+const getCategoryName = (key) => categories.find(c => c.key === key)?.name || key
+const getCategoryColor = (key) => {
+  const m = { writing: 'gold', programming: 'blue', analysis: 'purple', translation: 'cyan', office: 'geekblue', education: 'green', marketing: 'volcano' }
+  return m[key] || 'default'
+}
 
-const handleFavoriteClick = (template) => {
-  if (store.isFavorited(template.id)) {
-    handleUnfavorite(template)
+const handleFavoriteClick = async (item) => {
+  if (!userStore.isLoggedIn) { message.info('请先登录'); return }
+  if (isFavorited(item.id)) {
+    try {
+      await communityApi.removeFavorite(item.id)
+      await loadData()
+      message.success('已取消收藏')
+    }
+    catch { message.error('操作失败') }
     return
   }
-  selectedTemplate.value = template
-  favoriteForm.value.folderPath = favoriteFolder.value || ''
-  store.fetchFavoriteFolders('prompt')
+  selectedTemplate.value = item
+  favoriteForm.value.folderPath = ''
   showFavoriteModal.value = true
 }
 
@@ -546,698 +316,412 @@ const confirmFavorite = async () => {
   favoriting.value = true
   try {
     await communityApi.addFavorite({
-      template_id: selectedTemplate.value.id,
+      template_id: selectedTemplate.value?.id,
       item_type: 'prompt',
-      folder_path: favoriteForm.value.folderPath || null
+      folder_path: favoriteForm.value.folderPath || undefined
     })
+    await loadData()
     message.success('收藏成功')
     showFavoriteModal.value = false
-    await store.fetchFavorites('prompt')
-    await store.fetchFavoriteFolders('prompt')
-  } catch {
-    message.error('收藏失败')
-  } finally {
-    favoriting.value = false
   }
+  catch { message.error('收藏失败') }
+  finally { favoriting.value = false }
 }
 
-const handleUnfavorite = async (template) => {
-  try {
-    await communityApi.removeFavorite(template.id)
-    message.success('已取消收藏')
-    await store.fetchFavorites('prompt')
-    await store.fetchFavoriteFolders('prompt')
-    if (selectedTab.value[0] === 'favorites') totalCount.value = store.favorites.length
-  } catch {
-    message.error('操作失败')
-  }
+const handleFork = async (item) => {
+  try { await communityApi.forkTemplate(item.id, 'prompt'); message.success('已复制到提示词目录') }
+  catch { message.error('复制失败') }
 }
 
-const confirmCreateFolder = async () => {
-  const folderName = (newFolderName.value || '').trim()
-  if (!folderName) {
-    message.warning('请输入收藏夹名称')
-    return
-  }
-  if (availableFavoriteFolders.value.includes(folderName)) {
-    message.warning('收藏夹已存在')
-    return
-  }
+const openCreateFolderModal = () => { renameTarget.value = ''; newFolderName.value = ''; showCreateFolderModal.value = true }
+
+const openRenameFolderModal = (folder) => {
+  showFolderManagerModal.value = false
+  renameTarget.value = folder
+  newFolderName.value = folder
+  showCreateFolderModal.value = true
+}
+
+const openFolderManagerModal = () => {
+  folderManagerKeyword.value = ''
+  showFolderManagerModal.value = true
+}
+
+const selectFavoriteFolder = (folder) => {
+  favoriteFolder.value = folder
+  showFolderManagerModal.value = false
+}
+
+const handleConfirmFolder = async () => {
+  if (!newFolderName.value.trim()) { message.warning('请输入名称'); return }
   creatingFolder.value = true
   try {
-    await communityApi.createFavoriteFolder({
-      folder_name: folderName,
-      item_type: 'prompt'
-    })
-    await store.fetchFavoriteFolders('prompt')
-    favoriteFolder.value = folderName
-    favoriteForm.value.folderPath = folderName
-    showCreateFolderModal.value = false
-    newFolderName.value = ''
-    message.success('收藏夹已创建')
-  } finally {
-    creatingFolder.value = false
-  }
-}
-
-const handleFork = async (template) => {
-  try {
-    await communityApi.forkTemplate(template.id)
-    message.success('Fork 成功')
-    loadData()
-  } catch {
-    message.error('Fork 失败')
-  }
-}
-
-const handleRate = async (template) => {
-  try {
-    await communityApi.rateTemplate(template.id, myRating.value)
-    message.success('评分成功')
-  } catch {
-    message.error('评分失败')
-  }
-}
-
-const handleComment = async () => {
-  if (!newComment.value.trim()) return
-  try {
-    await communityApi.commentTemplate(selectedTemplate.value.id, newComment.value)
-    message.success('评论成功')
-    newComment.value = ''
-    const commentData = await communityApi.getTemplateComments(selectedTemplate.value.id)
-    comments.value = commentData.list || []
-  } catch {
-    message.error('评论失败')
-  }
-}
-
-const copyTemplateContent = async () => {
-  const content = selectedTemplate.value?.content || ''
-  if (!content.trim()) {
-    message.warning('暂无可复制内容')
-    return
-  }
-
-  try {
-    await navigator.clipboard.writeText(content)
-    message.success('提示词已复制')
-  } catch {
-    const textarea = document.createElement('textarea')
-    textarea.value = content
-    textarea.style.position = 'fixed'
-    textarea.style.opacity = '0'
-    document.body.appendChild(textarea)
-    textarea.focus()
-    textarea.select()
-    try {
-      const ok = document.execCommand('copy')
-      if (ok) {
-        message.success('提示词已复制')
-      } else {
-        message.error('复制失败，请手动复制')
-      }
-    } finally {
-      document.body.removeChild(textarea)
+    if (renameTarget.value) {
+      await communityApi.renameFavoriteFolder({
+        item_type: 'prompt',
+        old_folder_path: renameTarget.value,
+        new_folder_path: newFolderName.value.trim()
+      })
+      message.success('已重命名')
+    } else {
+      await communityApi.createFavoriteFolder({
+        item_type: 'prompt',
+        folder_name: newFolderName.value.trim()
+      })
+      message.success('已创建')
     }
+    showCreateFolderModal.value = false
+    renameTarget.value = ''
+    await store.fetchFavoriteFolders('prompt')
+    if (showFolderManagerModal.value) folderManagerKeyword.value = ''
   }
+  catch { message.error(renameTarget.value ? '重命名失败' : '创建失败') }
+  finally { creatingFolder.value = false }
 }
 
-const isFavorited = (templateId) => store.isFavorited(templateId)
-const getFolderCount = (folder) => folderCountMap.value.get(folder) || 0
-
-const getCategoryColor = (category) => {
-  const colors = {
-    writing: 'blue', programming: 'green', analysis: 'purple',
-    translation: 'orange', office: 'cyan', education: 'gold', marketing: 'red'
-  }
-  return colors[category] || 'default'
-}
-
-const getCategoryName = (category) => {
-  const cat = categories.find(c => c.key === category)
-  return cat ? cat.name : category
+const handleDeleteFolder = (folder) => {
+  Modal.confirm({
+    title: '删除收藏夹',
+    content: `确定删除收藏夹「${folder}」？该收藏夹内的所有收藏项也会被一并删除。`,
+    okText: '删除',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: async () => {
+      try {
+        await communityApi.deleteFavoriteFolder(folder, 'prompt')
+        message.success('已删除')
+        if (favoriteFolder.value === folder) favoriteFolder.value = ''
+        await store.fetchFavoriteFolders('prompt')
+        if (!filteredFavoriteFolders.value.length) folderManagerKeyword.value = ''
+        await loadData()
+      }
+      catch { message.error('删除失败') }
+    }
+  })
 }
 </script>
 
-<style scoped lang="less">
+<style scoped>
 .community-view {
-  --community-bg-1: #fff9f2;
-  --community-bg-2: #eef6ff;
-  --community-panel: rgba(255, 255, 255, 0.54);
-  --community-border: rgba(15, 23, 42, 0.08);
-  --community-shadow: 0 24px 52px rgba(27, 52, 92, 0.12);
-  --community-accent: #d97706;
-  --community-blue: #2563eb;
-  --community-text: #172033;
-  --community-muted: #60708a;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+  --cm-text: #172033;
+  --cm-muted: #60708a;
   padding: 28px;
+  min-height: 100%;
   background:
-    radial-gradient(circle at top left, rgba(245, 158, 11, 0.18), transparent 32%),
-    radial-gradient(circle at 90% 12%, rgba(37, 99, 235, 0.16), transparent 26%),
-    linear-gradient(180deg, var(--community-bg-1), var(--community-bg-2));
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 24%),
+    radial-gradient(circle at 90% 10%, rgba(245, 158, 11, 0.06), transparent 20%),
+    linear-gradient(180deg, #f8faff, #eef6ff 45%, #f9fbff);
 }
 
-.community-header {
+.community-top {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 18px;
-  padding: 20px 24px;
-  border-radius: 28px;
-  background: var(--community-panel);
-  border: 1px solid rgba(255, 255, 255, 0.58);
-  box-shadow: var(--community-shadow);
-  backdrop-filter: blur(14px);
+  align-items: flex-end;
+  gap: 18px;
+  max-width: 1340px;
+  margin: 0 auto 20px;
 }
 
-.header-right {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.btn-primary-solid {
-  background: linear-gradient(135deg, #d97706, #2563eb);
-  border: none;
-  color: #fff;
-  box-shadow: 0 14px 24px rgba(37, 99, 235, 0.16);
-}
-
-.btn-primary-solid:hover,
-.btn-primary-solid:focus {
-  background: linear-gradient(135deg, #c26a05, #1f56c9);
-  color: #fff;
-}
-
-.btn-primary-solid:active {
-  background: linear-gradient(135deg, #a95c05, #1b4cac);
-  color: #fff;
-}
-
-.btn-outline-primary {
-  background: rgba(37, 99, 235, 0.06);
-  border-color: rgba(37, 99, 235, 0.18);
-  color: var(--community-blue);
-}
-
-.btn-outline-primary:hover,
-.btn-outline-primary:focus {
-  background: rgba(37, 99, 235, 0.1);
-  border-color: rgba(37, 99, 235, 0.32);
-  color: #1d4ed8;
-}
-
-.btn-outline-primary:active {
-  background: rgba(37, 99, 235, 0.14);
-  border-color: rgba(37, 99, 235, 0.42);
-  color: #1e40af;
-}
-
-.community-content {
-  display: flex;
-  flex: 1;
-  gap: 20px;
-  overflow: hidden;
-}
-
-.sidebar {
-  width: 240px;
-  flex-shrink: 0;
-  background: var(--community-panel);
-  border-radius: 28px;
-  padding: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.56);
-  box-shadow: var(--community-shadow);
-  backdrop-filter: blur(14px);
-}
-
-.sidebar-section { margin-bottom: 24px; }
-
-.section-title {
-  font-size: 12px;
-  color: var(--community-muted);
-  margin-bottom: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+.top-kicker {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.5);
+  color: #2563eb;
+  font-size: 11px;
   font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
-.community-menu { border: none; }
-.community-menu :deep(.ant-menu-item) {
+.community-top h1 {
+  margin: 10px 0 8px;
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--cm-text);
+}
+
+.community-top p {
+  margin: 0;
+  color: var(--cm-muted);
+}
+
+.community-tabs {
+  display: flex;
+  gap: 8px;
+  max-width: 1340px;
+  margin: 0 auto 16px;
+}
+
+.community-bar {
   display: flex;
   align-items: center;
+  gap: 14px;
+  max-width: 1340px;
+  margin: 0 auto 18px;
+  flex-wrap: wrap;
+}
+
+.bar-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+
+.favorite-folder-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 280px;
+}
+
+.favorite-folder-select {
+  flex: 1;
+  min-width: 220px;
+}
+
+.bar-count {
+  color: var(--cm-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.community-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 1340px;
+  margin: 0 auto;
+}
+
+.empty-state, .loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 0;
+  max-width: 1340px;
+  margin: 0 auto;
+}
+
+.community-pagination {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
+  max-width: 1340px;
+  margin: 0 auto;
+}
+
+.detail-body {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 20px;
+  max-height: 600px;
+  overflow: auto;
+}
+
+.detail-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 240px;
+}
+
+.detail-meta-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+}
+
+.detail-meta-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.detail-meta-card__tags,
+.detail-tags {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 4px;
-  padding: 8px 12px;
-  border-radius: 14px;
-  color: var(--community-text);
 }
 
-.community-menu :deep(.ant-menu-item:hover) {
-  background: rgba(37, 99, 235, 0.08);
-  color: var(--community-blue);
+.detail-description {
+  margin: 0;
+  color: var(--cm-muted);
+  line-height: 1.75;
 }
 
-.community-menu :deep(.ant-menu-item-selected) {
-  background: linear-gradient(135deg, rgba(217, 119, 6, 0.12), rgba(37, 99, 235, 0.12));
-  color: var(--community-blue);
-  font-weight: 600;
+.detail-facts {
+  display: grid;
+  gap: 12px;
 }
 
-.category-list {
+.detail-fact {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(241, 245, 249, 0.78);
 }
 
-.category-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--community-text);
-  transition: all 0.2s;
+.detail-fact__label {
+  font-size: 12px;
+  color: #7c8aa5;
 }
 
-.category-item:hover {
-  background: rgba(37, 99, 235, 0.08);
-  border-color: rgba(37, 99, 235, 0.16);
-  color: var(--community-blue);
-}
-
-.category-item.active {
-  background: linear-gradient(135deg, rgba(217, 119, 6, 0.1), rgba(37, 99, 235, 0.1));
-  border-color: rgba(37, 99, 235, 0.3);
-  color: var(--community-blue);
+.detail-fact__value {
+  color: var(--cm-text);
   font-weight: 600;
 }
 
-.folder-panel {
-  margin-top: 6px;
-  padding: 12px;
-  border-radius: 18px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.34);
-}
-
-.folder-list {
+.detail-section {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 10px;
+  gap: 10px;
 }
 
-.folder-tip {
-  margin-top: 6px;
+.detail-preview {
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 18px;
+  padding: 18px;
+  backdrop-filter: blur(16px);
+}
+
+.detail-preview__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.detail-preview__head h4 { margin: 0; }
+
+.detail-preview__hint {
+  color: #7c8aa5;
   font-size: 12px;
-  color: var(--community-muted);
 }
 
-.folder-item {
+.detail-preview pre {
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0;
+  color: #334155;
+  min-height: 280px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(248, 250, 252, 0.88);
+  overflow: auto;
+}
+
+.detail-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  border-radius: 14px;
+  background: rgba(248, 250, 252, 0.88);
+  color: #94a3b8;
+}
+
+.folder-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.folder-manager__search {
+  width: 100%;
+}
+
+.folder-manager__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.folder-manager__item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--community-text);
-  transition: all 0.2s ease;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.2);
 }
 
-.folder-main {
+.folder-manager__name {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  flex: 1;
   min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--cm-text);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
 }
 
-.folder-name {
+.folder-manager__name span:first-child {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.folder-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.folder-more {
-  width: 20px;
-  height: 20px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--community-muted);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.folder-item:hover .folder-more,
-.folder-item.active .folder-more {
-  opacity: 1;
-}
-
-.folder-more:hover {
-  background: rgba(37, 99, 235, 0.1);
-  color: var(--community-blue);
-}
-
-.folder-item:hover {
-  background: rgba(37, 99, 235, 0.08);
-  border-color: rgba(37, 99, 235, 0.16);
-  color: var(--community-blue);
-}
-
-.folder-item.active {
-  background: linear-gradient(135deg, rgba(217, 119, 6, 0.1), rgba(37, 99, 235, 0.1));
-  border-color: rgba(37, 99, 235, 0.3);
-  color: var(--community-blue);
-  font-weight: 600;
-}
-
-.folder-empty {
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px dashed rgba(148, 163, 184, 0.5);
-  color: var(--community-muted);
+.folder-manager__active {
+  flex-shrink: 0;
   font-size: 12px;
-  text-align: center;
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.12);
+  padding: 2px 8px;
+  border-radius: 999px;
 }
 
-.main-content {
-  flex: 1;
-  min-width: 0;
-  overflow-y: auto;
-  padding: 20px 22px;
-  border-radius: 28px;
-  background: var(--community-panel);
-  border: 1px solid rgba(255, 255, 255, 0.56);
-  box-shadow: var(--community-shadow);
-  backdrop-filter: blur(14px);
-}
-
-.content-header {
+.folder-manager__actions {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
-}
-
-.sort-options :deep(.ant-radio-group) {
-  display: inline-flex;
   gap: 4px;
-  padding: 3px;
-  border-radius: 8px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.42);
 }
 
-.sort-options :deep(.ant-radio-button-wrapper) {
-  height: 30px;
-  line-height: 30px;
-  padding: 0 14px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--community-text);
-  font-size: 13px;
-  transition: all 0.2s ease;
+@media (max-width: 1024px) {
+  .detail-body { grid-template-columns: 1fr; }
 }
 
-.sort-options :deep(.ant-radio-button-wrapper:not(:first-child)::before) {
-  display: none;
-}
-
-.sort-options :deep(.ant-radio-button-wrapper:hover) {
-  background: rgba(37, 99, 235, 0.08);
-  color: var(--community-blue);
-}
-
-.sort-options :deep(.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled)) {
-  background: linear-gradient(135deg, #d97706, #2563eb);
-  color: #fff;
-  font-weight: 600;
-  box-shadow: none;
-}
-
-.sort-options :deep(.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled):hover),
-.sort-options :deep(.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled):focus) {
-  background: linear-gradient(135deg, #c26a05, #1f56c9);
-  color: #fff;
-}
-
-.template-count { font-size: 13px; color: var(--community-muted); }
-
-.template-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  color: var(--community-muted);
-}
-
-.loading-state {
-  display: flex;
-  justify-content: center;
-  padding: 40px;
-  border: 1px dashed rgba(37, 99, 235, 0.18);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.32);
-}
-
-.loading-state :deep(.ant-spin) {
-  color: var(--community-blue);
-}
-
-.loading-state :deep(.ant-spin-dot-item) {
-  background-color: var(--community-blue);
-}
-
-.pagination { margin-top: 16px; text-align: center; }
-
-.detail-content { width: 100%; }
-.detail-layout { display: flex; gap: 24px; height: 100%; }
-.detail-preview { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; }
-.detail-info { width: 300px; flex-shrink: 0; height: 100%; overflow-y: auto; }
-
-.preview-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.preview-header h4 {
-  margin: 0;
-}
-
-.preview-content {
-  background: rgba(255, 255, 255, 0.36);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 18px;
-  padding: 12px;
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-
-.preview-content pre {
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-size: 13px;
-  line-height: 1.6;
-  margin: 0;
-}
-
-.detail-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.author { font-size: 13px; color: #999; }
-.author { font-size: 13px; color: var(--community-muted); }
-.dept-tag { font-size: 12px; color: var(--community-blue); background: rgba(37, 99, 235, 0.08); padding: 1px 8px; border-radius: 999px; }
-
-.detail-description { margin-top: 16px; }
-.detail-description h4 { font-size: 14px; margin-bottom: 8px; }
-.detail-description p { font-size: 13px; color: var(--community-text); line-height: 1.6; }
-
-.detail-rating { margin-top: 16px; }
-.detail-rating h4 { font-size: 14px; margin-bottom: 8px; }
-
-.detail-variables { margin-top: 16px; }
-.detail-variables h4 { font-size: 14px; margin-bottom: 8px; }
-.variable-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-
-.detail-tags { margin-top: 16px; }
-.detail-tags h4 { font-size: 14px; margin-bottom: 8px; }
-
-.detail-comments { margin-top: 16px; }
-.detail-comments h4 { font-size: 14px; margin-bottom: 8px; }
-
-.comment-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
-.comment-item { display: flex; gap: 8px; }
-.comment-avatar { flex-shrink: 0; }
-.comment-content { flex: 1; min-width: 0; }
-.comment-header { display: flex; gap: 8px; margin-bottom: 4px; }
-.comment-author { font-size: 13px; font-weight: 500; }
-.comment-time { font-size: 12px; color: var(--community-muted); }
-.comment-text { font-size: 13px; line-height: 1.5; }
-
-.comment-input { display: flex; gap: 8px; }
-.comment-input .ant-input { flex: 1; }
-
-:deep(.template-detail-modal .ant-modal-content) {
-  height: 680px;
-  display: flex;
-  flex-direction: column;
-  border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.58);
-  overflow: hidden;
-  box-shadow: var(--community-shadow);
-}
-
-:deep(.template-detail-modal .ant-modal-body) {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-:deep(.ant-modal-footer .ant-btn-primary) {
-  background: linear-gradient(135deg, #d97706, #2563eb);
-  border: none;
-}
-
-:deep(.ant-modal-footer .ant-btn-primary:hover),
-:deep(.ant-modal-footer .ant-btn-primary:focus) {
-  background: linear-gradient(135deg, #c26a05, #1f56c9);
-}
-
-:deep(.ant-modal-footer .ant-btn-primary:active) {
-  background: linear-gradient(135deg, #a95c05, #1b4cac);
-}
-
-.community-view :deep(.ant-input),
-.community-view :deep(.ant-input-affix-wrapper),
-.community-view :deep(.ant-select-selector),
-.community-view :deep(.ant-auto-complete .ant-select-selector) {
-  border-radius: 16px !important;
-  border-color: rgba(15, 23, 42, 0.08) !important;
-  box-shadow: none !important;
-}
-
-.community-view :deep(.ant-btn-primary) {
-  background: linear-gradient(135deg, #d97706, #2563eb);
-  border: none;
-  box-shadow: 0 14px 24px rgba(37, 99, 235, 0.16);
-}
-
-:deep(.ant-btn-dangerous) {
-  color: var(--color-error-700);
-  border-color: var(--color-error-100);
-  background: var(--color-error-50);
-}
-
-:deep(.ant-btn-dangerous:hover),
-:deep(.ant-btn-dangerous:focus) {
-  color: var(--gray-0);
-  border-color: var(--color-error-700);
-  background: var(--color-error-700);
-}
-
-:global(.dark) .community-view { background: #141414; }
-:global(.dark) .sidebar { background: #1f1f1f; }
-:global(.dark) .category-item:hover { background: #2a2a2a; border-color: #334155; color: #9ec3ff; }
-:global(.dark) .category-item.active { background: #111d2c; border-color: #3d6bc0; color: #9ec3ff; }
-:global(.dark) .community-menu :deep(.ant-menu-item) { color: #c2c8d2; }
-:global(.dark) .community-menu :deep(.ant-menu-item:hover) { background: #1f334f; color: #9ec3ff; }
-:global(.dark) .community-menu :deep(.ant-menu-item-selected) { background: #1a3557; color: #9ec3ff; }
-:global(.dark) .sort-options :deep(.ant-radio-group) {
-  background: #1c2434;
-  border-color: #2c3a52;
-}
-:global(.dark) .sort-options :deep(.ant-radio-button-wrapper) {
-  color: #c2c8d2;
-}
-:global(.dark) .sort-options :deep(.ant-radio-button-wrapper:hover) {
-  background: #1f334f;
-  color: #9ec3ff;
-}
-:global(.dark) .sort-options :deep(.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled)) {
-  background: #2e5ac4;
-  color: #f8fafe;
-}
-:global(.dark) .sort-options :deep(.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled):hover),
-:global(.dark) .sort-options :deep(.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled):focus) {
-  background: #4a72d6;
-  color: #ffffff;
-}
-:global(.dark) .folder-panel {
-  border-color: #30343b;
-  background: linear-gradient(180deg, #1d1f24 0%, #181a1f 100%);
-}
-:global(.dark) .folder-item:hover {
-  background: #2a2e36;
-  border-color: #3a404a;
-  color: #d1d5db;
-}
-:global(.dark) .folder-item.active {
-  background: #1b3552;
-  border-color: #2a5d92;
-  color: #74b1ff;
-}
-:global(.dark) .folder-more {
-  color: #7d8592;
-}
-:global(.dark) .folder-more:hover {
-  background: #303642;
-  color: #c2c8d2;
-}
-:global(.dark) .folder-empty {
-  border-color: #3a3f47;
-  color: #9ca3af;
-}
-:global(.dark) .loading-state {
-  border-color: #33445f;
-  background: linear-gradient(180deg, #1b2435 0%, #171f2f 100%);
-}
-:global(.dark) .loading-state :deep(.ant-spin-dot-item) {
-  background-color: #8faaea;
-}
-:global(.dark) .preview-content { background: #1f1f1f; border-color: #303030; }
-
-@media (max-width: 960px) {
-  .community-view {
-    padding: 16px;
-  }
-
-  .community-content {
-    flex-direction: column;
-    overflow: visible;
-  }
-
-  .sidebar {
+@media (max-width: 820px) {
+  .community-view { padding: 16px; }
+  .community-top { flex-direction: column; align-items: stretch; }
+  .favorite-folder-toolbar {
     width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .detail-meta-card__head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .folder-manager__item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .folder-manager__actions {
+    justify-content: flex-end;
   }
 }
 </style>

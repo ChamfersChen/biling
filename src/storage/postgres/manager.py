@@ -192,6 +192,92 @@ class PostgresManager(metaclass=SingletonMeta):
                     "CREATE INDEX IF NOT EXISTS idx_product_content_generations_prompt_external_id ON product_content_generations (prompt_external_id)"
                 )
             )
+            await conn.execute(
+                text(
+                    "ALTER TABLE products ADD COLUMN IF NOT EXISTS image_paths JSONB DEFAULT '[]'::jsonb"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE products DROP COLUMN IF EXISTS category"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE product_subscriptions ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(128)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE product_subscriptions ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(128)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE product_subscriptions ADD COLUMN IF NOT EXISTS next_billing_date TIMESTAMP WITHOUT TIME ZONE"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_product_subscriptions_stripe_customer_id ON product_subscriptions (stripe_customer_id)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_product_subscriptions_stripe_subscription_id ON product_subscriptions (stripe_subscription_id)"
+                )
+            )
+            await conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS subscription_codes (
+                        id SERIAL PRIMARY KEY,
+                        code VARCHAR(64) NOT NULL UNIQUE,
+                        tier VARCHAR(32) NOT NULL,
+                        max_uses INTEGER NULL,
+                        used_count INTEGER NOT NULL DEFAULT 0,
+                        expires_at TIMESTAMP WITHOUT TIME ZONE NULL,
+                        created_by VARCHAR(64) NULL,
+                        created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+                        updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+                    )
+                    """
+                )
+            )
+            await conn.execute(
+                text("CREATE INDEX IF NOT EXISTS idx_subscription_codes_tier ON subscription_codes (tier)")
+            )
+            await conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS subscription_transactions (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        department_id INTEGER NULL REFERENCES departments(id) ON DELETE SET NULL,
+                        tier VARCHAR(32) NOT NULL,
+                        source VARCHAR(32) NOT NULL DEFAULT 'stripe',
+                        amount INTEGER NOT NULL DEFAULT 0,
+                        currency VARCHAR(16) NOT NULL DEFAULT 'cny',
+                        stripe_session_id VARCHAR(128) NULL,
+                        stripe_payment_intent_id VARCHAR(128) NULL,
+                        status VARCHAR(32) NOT NULL DEFAULT 'pending',
+                        paid_at TIMESTAMP WITHOUT TIME ZONE NULL,
+                        created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+                        updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+                    )
+                    """
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_subscription_transactions_user_id ON subscription_transactions (user_id)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_subscription_transactions_status ON subscription_transactions (status)"
+                )
+            )
 
     async def drop_tables(self):
         """删除所有表（慎用！）"""

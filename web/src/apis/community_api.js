@@ -59,11 +59,8 @@ export const createFavoriteFolder = async (payload) => {
   return apiPost(`${BASE_URL}/favorites/folders`, payload)
 }
 
-export const deleteFavoriteFolder = async (payload) => {
-  return apiDelete(`${BASE_URL}/favorites/folders`, {
-    body: JSON.stringify(payload),
-    headers: { 'Content-Type': 'application/json' }
-  })
+export const deleteFavoriteFolder = async (folderName, itemType = 'prompt') => {
+  return apiDelete(`${BASE_URL}/favorites/folders/${encodeURIComponent(folderName)}?item_type=${encodeURIComponent(itemType)}`)
 }
 
 export const addFavorite = async (payload) => {

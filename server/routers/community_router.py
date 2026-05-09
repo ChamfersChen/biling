@@ -75,9 +75,6 @@ class CreateFavoriteFolderRequest(BaseModel):
     item_type: str = Field("prompt", description="类型: prompt")
 
 
-class DeleteFavoriteFolderRequest(BaseModel):
-    folder_name: str = Field(..., min_length=1, description="收藏夹名称")
-    item_type: str = Field("prompt", description="类型: prompt")
 
 
 # ============================================================
@@ -244,24 +241,6 @@ async def add_favorite(
         raise HTTPException(status_code=500, detail="收藏失败")
 
 
-@community.delete("/favorites/{template_id}")
-async def remove_favorite(
-    template_id: str,
-    current_user: User = Depends(get_required_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """取消收藏"""
-    try:
-        service = CommunityService(db)
-        await service.remove_favorite(current_user.id, template_id, department_id=current_user.department_id)
-        return {"success": True}
-    except ValueError as e:
-        _raise_from_value_error(e)
-    except Exception as e:
-        logger.error(f"取消收藏失败: {e}")
-        raise HTTPException(status_code=500, detail="取消收藏失败")
-
-
 @community.put("/favorites/folders/rename")
 async def rename_favorite_folder(
     payload: RenameFavoriteFolderRequest,
@@ -309,19 +288,20 @@ async def create_favorite_folder(
         raise HTTPException(status_code=500, detail="创建收藏夹失败")
 
 
-@community.delete("/favorites/folders")
+@community.delete("/favorites/folders/{folder_name}")
 async def delete_favorite_folder(
-    payload: DeleteFavoriteFolderRequest,
+    folder_name: str,
+    item_type: str = Query("prompt", description="类型: prompt"),
     current_user: User = Depends(get_required_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """删除收藏夹（仅删除文件夹本身，不删除收藏项）"""
+    """删除收藏夹及其包含的所有收藏项"""
     try:
         service = CommunityService(db)
         removed_count = await service.delete_favorite_folder(
             user_id=current_user.id,
-            folder_name=payload.folder_name,
-            item_type=payload.item_type,
+            folder_name=folder_name,
+            item_type=item_type,
             department_id=current_user.department_id,
         )
         return {"success": removed_count > 0, "removed": removed_count}
@@ -330,6 +310,24 @@ async def delete_favorite_folder(
     except Exception as e:
         logger.error(f"删除收藏夹失败: {e}")
         raise HTTPException(status_code=500, detail="删除收藏夹失败")
+
+
+@community.delete("/favorites/{template_id}")
+async def remove_favorite(
+    template_id: str,
+    current_user: User = Depends(get_required_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """取消收藏"""
+    try:
+        service = CommunityService(db)
+        await service.remove_favorite(current_user.id, template_id, department_id=current_user.department_id)
+        return {"success": True}
+    except ValueError as e:
+        _raise_from_value_error(e)
+    except Exception as e:
+        logger.error(f"取消收藏失败: {e}")
+        raise HTTPException(status_code=500, detail="取消收藏失败")
 
 
 # ============================================================

@@ -57,6 +57,9 @@
           >
             <span class="menu-text">系统设置</span>
           </a-menu-item>
+          <a-menu-item key="subscription" @click="goToSubscription" :icon="WalletCardsIcon">
+            <span class="menu-text">订阅中心</span>
+          </a-menu-item>
           <a-menu-item key="logout" @click="logout" :icon="LogOutIcon">
             <span class="menu-text">退出登录</span>
           </a-menu-item>
@@ -199,7 +202,8 @@ import {
   LogOut,
   Upload,
   Settings,
-  Terminal
+  Terminal,
+  WalletCards
 } from 'lucide-vue-next'
 import { useThemeStore } from '@/stores/theme'
 
@@ -214,6 +218,7 @@ const MoonIcon = h(Moon, { size: '16' })
 const TerminalIcon = h(Terminal, { size: '16' })
 const SettingsIcon = h(Settings, { size: '16' })
 const LogOutIcon = h(LogOut, { size: '16' })
+const WalletCardsIcon = h(WalletCards, { size: '16' })
 
 // 调试面板状态
 const showDebug = ref(false)
@@ -297,6 +302,10 @@ const goToSetting = () => {
   if (openSettingsModal) {
     openSettingsModal()
   }
+}
+
+const goToSubscription = () => {
+  router.push('/product-content/subscription')
 }
 
 // 打开个人资料页面

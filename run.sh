@@ -1,0 +1,1 @@
+uv run --no-dev uvicorn server.main:app --host 0.0.0.0 --port 15050 --reload

@@ -4,7 +4,7 @@ import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import {
   GithubOutlined,
 } from '@ant-design/icons-vue'
-import { BookText, Package, Users } from 'lucide-vue-next'
+import { BarChart3, BookText, Package, Users } from 'lucide-vue-next'
 
 import { useConfigStore } from '@/stores/config'
 // import { useDatabaseStore } from '@/stores/database'
@@ -28,17 +28,6 @@ const route = useRoute()
 const router = useRouter()
 
 const isNormalUser = computed(() => userStore.userRole === 'user')
-const normalUserNavItems = computed(() => [
-  { name: '社区', path: '/community', icon: Users },
-  { name: '产品文案', path: '/product-content/generate', icon: Package }
-])
-
-const topHeaderTitle = computed(() => {
-  if (route.path.startsWith('/product-content')) {
-    return '产品文案'
-  }
-  return '社区'
-})
 
 const layoutSettings = reactive({
   showDebug: false,
@@ -85,6 +74,12 @@ onMounted(async () => {
 const mainList = computed(() => {
   const items = [
     {
+      name: '数据看板',
+      path: '/product-content/dashboard',
+      icon: BarChart3,
+      activeIcon: BarChart3
+    },
+    {
       name: '产品文案',
       path: '/product-content/generate',
       icon: Package,
@@ -95,12 +90,6 @@ const mainList = computed(() => {
       path: '/extensions/prompts',
       icon: BookText,
       activeIcon: BookText
-    },
-    {
-      name: '社区',
-      path: '/community',
-      icon: Users,
-      activeIcon: Users
     }
   ]
 
@@ -114,48 +103,15 @@ provide('settingsModal', {
 </script>
 
 <template>
-  <div class="app-layout" :class="{ 'use-top-bar': layoutSettings.useTopBar, 'normal-user': isNormalUser }">
-    <!-- 普通用户: 顶部导航栏 -->
-    <div v-if="isNormalUser" class="top-header">
-      <div class="top-header-left">
-        <div class="logo circle">
-          <router-link to="/community">
-            <img :src="infoStore.organization.avatar" />
-          </router-link>
-        </div>
-        <div>
-          <span class="top-header-title">{{ topHeaderTitle }}</span>
-          <div class="top-header-subtitle">内容浏览与生成工作台</div>
-        </div>
-        <div class="top-header-nav">
-          <RouterLink
-            v-for="item in normalUserNavItems"
-            :key="item.path"
-            :to="item.path"
-            class="top-header-link"
-            :class="{ active: route.path.startsWith(item.path) }"
-          >
-            <component :is="item.icon" :size="15" />
-            <span>{{ item.name }}</span>
-          </RouterLink>
-        </div>
-      </div>
-      <div class="top-header-right">
-        <div class="nav-item user-info">
-          <UserInfoComponent />
-        </div>
-      </div>
-    </div>
-
-    <!-- 管理员: 左侧导航栏 -->
-    <div v-else class="header" :class="{ 'top-bar': layoutSettings.useTopBar }">
+  <div class="app-layout" :class="{ 'use-top-bar': layoutSettings.useTopBar }">
+    <!-- 侧边栏（普通用户和管理员统一） -->
+    <div class="header" :class="{ 'top-bar': layoutSettings.useTopBar }">
       <div class="logo circle">
         <router-link to="/">
           <img :src="infoStore.organization.avatar" />
         </router-link>
       </div>
       <div class="nav">
-        <!-- 使用mainList渲染导航项 -->
         <RouterLink
           v-for="(item, index) in mainList"
           :key="index"
@@ -175,6 +131,16 @@ provide('settingsModal', {
         </RouterLink>
       </div>
       <div class="fill"></div>
+      <RouterLink
+        to="/community"
+        class="nav-item"
+        :class="{ active: route.path.startsWith('/community') }"
+      >
+        <a-tooltip placement="right">
+          <template #title>社区</template>
+          <Users class="icon" size="22" />
+        </a-tooltip>
+      </RouterLink>
       <div class="github nav-item">
         <a-tooltip placement="right">
           <template #title>欢迎 Star</template>
@@ -183,16 +149,14 @@ provide('settingsModal', {
           </a>
         </a-tooltip>
       </div>
-      <!-- 用户信息组件 -->
       <div class="nav-item user-info">
         <UserInfoComponent />
       </div>
     </div>
-    <router-view v-slot="{ Component, route }" id="app-router-view">
-      <keep-alive v-if="route.meta.keepAlive !== false">
+    <router-view v-slot="{ Component }" id="app-router-view">
+      <keep-alive>
         <component :is="Component" />
       </keep-alive>
-      <component :is="Component" v-else />
     </router-view>
 
     <!-- Debug Modal -->
@@ -324,6 +288,7 @@ div.header,
 
     &.github {
       padding: 10px 12px;
+      margin-top: 16px;
       margin-bottom: 16px;
       &:hover {
         background-color: transparent;
@@ -395,95 +360,6 @@ div.header,
   flex-direction: column;
 }
 
-.app-layout.normal-user {
-  flex-direction: column;
-}
-
-.top-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 48px;
-  padding: 0 20px;
-  background-color: var(--main-0);
-  border-bottom: 1px solid var(--gray-100);
-  flex-shrink: 0;
-  width: 100%;
-}
-
-.top-header-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.top-header-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--gray-1000);
-}
-
-.top-header-subtitle {
-  font-size: 12px;
-  color: var(--gray-500);
-}
-
-.top-header-nav {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: 10px;
-}
-
-.top-header-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 34px;
-  padding: 0 12px;
-  border-radius: 999px;
-  border: 1px solid var(--gray-100);
-  color: var(--gray-700);
-  background: var(--gray-0);
-  text-decoration: none;
-  transition: all 0.2s ease-in-out;
-}
-
-.top-header-link:hover,
-.top-header-link.active {
-  color: var(--main-color);
-  border-color: var(--main-100);
-  background: var(--main-20);
-}
-
-.top-header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-@media (max-width: 900px) {
-  .top-header {
-    height: auto;
-    padding: 10px 14px;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  .top-header-left {
-    flex-wrap: wrap;
-  }
-
-  .top-header-nav {
-    width: 100%;
-    margin-left: 0;
-    flex-wrap: wrap;
-  }
-}
-
-.app-layout.normal-user #app-router-view {
-  height: calc(100vh - 48px);
-}
 
 .header.top-bar {
   flex-direction: row;

@@ -17,7 +17,6 @@ class Product(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     department_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True, index=True)
-    category = Column(String(64), nullable=False, default="general", index=True)
     name = Column(String(128), nullable=False)
     material = Column(String(64), nullable=True)
     style = Column(String(64), nullable=True)
@@ -27,6 +26,7 @@ class Product(Base):
     target_audience = Column(String(128), nullable=True)
     price_range = Column(String(64), nullable=True)
     attributes = Column(JSONB, nullable=False, default=dict)
+    image_paths = Column(JSONB, nullable=False, default=list)
     created_at = Column(DateTime, nullable=False, default=utc_now_naive)
     updated_at = Column(DateTime, nullable=False, default=utc_now_naive, onupdate=utc_now_naive)
 
@@ -35,7 +35,6 @@ class Product(Base):
             "id": self.id,
             "user_id": self.user_id,
             "department_id": self.department_id,
-            "category": self.category,
             "name": self.name,
             "material": self.material,
             "style": self.style,
@@ -45,6 +44,7 @@ class Product(Base):
             "target_audience": self.target_audience,
             "price_range": self.price_range,
             "attributes": self.attributes or {},
+            "image_paths": self.image_paths or [],
             "created_at": format_utc_datetime(self.created_at),
             "updated_at": format_utc_datetime(self.updated_at),
         }
@@ -122,6 +122,9 @@ class ProductSubscription(Base):
     department_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True)
     tier = Column(String(32), nullable=False, default="free", index=True)
     status = Column(String(32), nullable=False, default="active", index=True)
+    stripe_customer_id = Column(String(128), nullable=True, index=True)
+    stripe_subscription_id = Column(String(128), nullable=True, index=True)
+    next_billing_date = Column(DateTime, nullable=True)
     started_at = Column(DateTime, nullable=False, default=utc_now_naive)
     expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=utc_now_naive)
@@ -134,8 +137,73 @@ class ProductSubscription(Base):
             "department_id": self.department_id,
             "tier": self.tier,
             "status": self.status,
+            "stripe_customer_id": self.stripe_customer_id,
+            "stripe_subscription_id": self.stripe_subscription_id,
+            "next_billing_date": format_utc_datetime(self.next_billing_date),
             "started_at": format_utc_datetime(self.started_at),
             "expires_at": format_utc_datetime(self.expires_at),
+            "created_at": format_utc_datetime(self.created_at),
+            "updated_at": format_utc_datetime(self.updated_at),
+        }
+
+
+class SubscriptionCode(Base):
+    __tablename__ = "subscription_codes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    code = Column(String(64), nullable=False, unique=True, index=True)
+    tier = Column(String(32), nullable=False, index=True)
+    max_uses = Column(Integer, nullable=True)
+    used_count = Column(Integer, nullable=False, default=0)
+    expires_at = Column(DateTime, nullable=True)
+    created_by = Column(String(64), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=utc_now_naive)
+    updated_at = Column(DateTime, nullable=False, default=utc_now_naive, onupdate=utc_now_naive)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "code": self.code,
+            "tier": self.tier,
+            "max_uses": self.max_uses,
+            "used_count": self.used_count,
+            "expires_at": format_utc_datetime(self.expires_at),
+            "created_by": self.created_by,
+            "created_at": format_utc_datetime(self.created_at),
+            "updated_at": format_utc_datetime(self.updated_at),
+        }
+
+
+class SubscriptionTransaction(Base):
+    __tablename__ = "subscription_transactions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    department_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True, index=True)
+    tier = Column(String(32), nullable=False, index=True)
+    source = Column(String(32), nullable=False, default="stripe", index=True)
+    amount = Column(Integer, nullable=False, default=0)
+    currency = Column(String(16), nullable=False, default="cny")
+    stripe_session_id = Column(String(128), nullable=True, index=True)
+    stripe_payment_intent_id = Column(String(128), nullable=True, index=True)
+    status = Column(String(32), nullable=False, default="pending", index=True)
+    paid_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=utc_now_naive)
+    updated_at = Column(DateTime, nullable=False, default=utc_now_naive, onupdate=utc_now_naive)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "department_id": self.department_id,
+            "tier": self.tier,
+            "source": self.source,
+            "amount": self.amount,
+            "currency": self.currency,
+            "stripe_session_id": self.stripe_session_id,
+            "stripe_payment_intent_id": self.stripe_payment_intent_id,
+            "status": self.status,
+            "paid_at": format_utc_datetime(self.paid_at),
             "created_at": format_utc_datetime(self.created_at),
             "updated_at": format_utc_datetime(self.updated_at),
         }

@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.storage.postgres.models_product_content import (
     Product,
     ProductContentGeneration,
+    SubscriptionCode,
+    SubscriptionTransaction,
     ProductSubscription,
     ProductUsageDaily,
 )
@@ -42,7 +44,6 @@ class ProductContentRepository:
         *,
         user_id: int,
         department_id: int | None,
-        category: str | None,
         keyword: str | None,
         page: int,
         page_size: int,
@@ -52,8 +53,6 @@ class ProductContentRepository:
             query = query.where(Product.department_id.is_(None))
         else:
             query = query.where(Product.department_id == department_id)
-        if category:
-            query = query.where(Product.category == category)
         if keyword:
             query = query.where(Product.name.ilike(f"%{keyword}%"))
 
@@ -141,6 +140,74 @@ class ProductContentRepository:
         await self.db.refresh(item)
         return item
 
+    async def update_subscription(self, subscription: ProductSubscription, **kwargs) -> ProductSubscription:
+        for key, value in kwargs.items():
+            setattr(subscription, key, value)
+        subscription.updated_at = utc_now_naive()
+        await self.db.commit()
+        await self.db.refresh(subscription)
+        return subscription
+
+    async def get_subscription_code(self, code: str) -> SubscriptionCode | None:
+        result = await self.db.execute(select(SubscriptionCode).where(SubscriptionCode.code == code))
+        return result.scalar_one_or_none()
+
+    async def create_subscription_code(self, **kwargs) -> SubscriptionCode:
+        item = SubscriptionCode(**kwargs)
+        self.db.add(item)
+        await self.db.commit()
+        await self.db.refresh(item)
+        return item
+
+    async def list_subscription_codes(self) -> list[SubscriptionCode]:
+        result = await self.db.execute(select(SubscriptionCode).order_by(SubscriptionCode.created_at.desc()))
+        return list(result.scalars().all())
+
+    async def update_subscription_code(self, item: SubscriptionCode, **kwargs) -> SubscriptionCode:
+        for key, value in kwargs.items():
+            setattr(item, key, value)
+        item.updated_at = utc_now_naive()
+        await self.db.commit()
+        await self.db.refresh(item)
+        return item
+
+    async def create_subscription_transaction(self, **kwargs) -> SubscriptionTransaction:
+        item = SubscriptionTransaction(**kwargs)
+        self.db.add(item)
+        await self.db.commit()
+        await self.db.refresh(item)
+        return item
+
+    async def get_transaction_by_session_id(self, session_id: str) -> SubscriptionTransaction | None:
+        result = await self.db.execute(
+            select(SubscriptionTransaction).where(SubscriptionTransaction.stripe_session_id == session_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def update_subscription_transaction(self, item: SubscriptionTransaction, **kwargs) -> SubscriptionTransaction:
+        for key, value in kwargs.items():
+            setattr(item, key, value)
+        item.updated_at = utc_now_naive()
+        await self.db.commit()
+        await self.db.refresh(item)
+        return item
+
+    async def list_transactions(
+        self,
+        *,
+        user_id: int,
+        department_id: int | None,
+        limit: int = 20,
+    ) -> list[SubscriptionTransaction]:
+        query = select(SubscriptionTransaction).where(SubscriptionTransaction.user_id == user_id)
+        if department_id is None:
+            query = query.where(SubscriptionTransaction.department_id.is_(None))
+        else:
+            query = query.where(SubscriptionTransaction.department_id == department_id)
+        query = query.order_by(SubscriptionTransaction.created_at.desc()).limit(limit)
+        result = await self.db.execute(query)
+        return list(result.scalars().all())
+
     async def get_daily_usage(self, *, user_id: int, usage_date: dt.date) -> ProductUsageDaily | None:
         result = await self.db.execute(
             select(ProductUsageDaily).where(
@@ -212,3 +279,125 @@ class ProductContentRepository:
             )
         )
         return int(result.scalar() or 0)
+
+    async def count_products(self, *, user_id: int, department_id: int | None) -> int:
+        query = select(func.count()).select_from(Product).where(Product.user_id == user_id)
+        if department_id is None:
+            query = query.where(Product.department_id.is_(None))
+        else:
+            query = query.where(Product.department_id == department_id)
+        return int((await self.db.execute(query)).scalar() or 0)
+
+    async def count_generations(self, *, user_id: int, department_id: int | None) -> int:
+        query = select(func.count()).select_from(ProductContentGeneration).where(ProductContentGeneration.user_id == user_id)
+        if department_id is None:
+            query = query.where(ProductContentGeneration.department_id.is_(None))
+        else:
+            query = query.where(ProductContentGeneration.department_id == department_id)
+        return int((await self.db.execute(query)).scalar() or 0)
+
+    async def count_generations_in_range(
+        self,
+        *,
+        user_id: int,
+        department_id: int | None,
+        start_at: dt.datetime,
+        end_at: dt.datetime,
+    ) -> int:
+        query = select(func.count()).select_from(ProductContentGeneration).where(
+            ProductContentGeneration.user_id == user_id,
+            ProductContentGeneration.created_at >= start_at,
+            ProductContentGeneration.created_at <= end_at,
+        )
+        if department_id is None:
+            query = query.where(ProductContentGeneration.department_id.is_(None))
+        else:
+            query = query.where(ProductContentGeneration.department_id == department_id)
+        return int((await self.db.execute(query)).scalar() or 0)
+
+    async def count_generated_items(self, *, user_id: int, department_id: int | None) -> int:
+        items, _ = await self.list_generations(user_id=user_id, department_id=department_id, page=1, page_size=100000)
+        return sum(len(item.result_items or []) for item in items)
+
+    async def count_generated_items_in_range(
+        self,
+        *,
+        user_id: int,
+        department_id: int | None,
+        start_at: dt.datetime,
+        end_at: dt.datetime,
+    ) -> int:
+        query = select(ProductContentGeneration).where(
+            ProductContentGeneration.user_id == user_id,
+            ProductContentGeneration.created_at >= start_at,
+            ProductContentGeneration.created_at <= end_at,
+        )
+        if department_id is None:
+            query = query.where(ProductContentGeneration.department_id.is_(None))
+        else:
+            query = query.where(ProductContentGeneration.department_id == department_id)
+        result = await self.db.execute(query)
+        items = list(result.scalars().all())
+        return sum(len(item.result_items or []) for item in items)
+
+    async def get_recent_daily_usage(
+        self,
+        *,
+        user_id: int,
+        department_id: int | None,
+        start_date: dt.date,
+        end_date: dt.date,
+    ) -> list[ProductUsageDaily]:
+        query = select(ProductUsageDaily).where(
+            ProductUsageDaily.user_id == user_id,
+            ProductUsageDaily.usage_date >= start_date,
+            ProductUsageDaily.usage_date <= end_date,
+        )
+        if department_id is None:
+            query = query.where(ProductUsageDaily.department_id.is_(None))
+        else:
+            query = query.where(ProductUsageDaily.department_id == department_id)
+        query = query.order_by(ProductUsageDaily.usage_date.asc())
+        result = await self.db.execute(query)
+        return list(result.scalars().all())
+
+    async def get_channel_generation_counts(
+        self,
+        *,
+        user_id: int,
+        department_id: int | None,
+    ) -> list[tuple[str, int]]:
+        query = select(
+            ProductContentGeneration.channel,
+            func.count(ProductContentGeneration.id),
+        ).where(ProductContentGeneration.user_id == user_id)
+        if department_id is None:
+            query = query.where(ProductContentGeneration.department_id.is_(None))
+        else:
+            query = query.where(ProductContentGeneration.department_id == department_id)
+        query = query.group_by(ProductContentGeneration.channel).order_by(func.count(ProductContentGeneration.id).desc())
+        result = await self.db.execute(query)
+        return [(str(channel or "unknown"), int(total or 0)) for channel, total in result.all()]
+
+    async def update_generation_item_image_prompt(
+        self,
+        *,
+        generation_id: int,
+        item_index: int,
+        image_prompt: str,
+    ) -> ProductContentGeneration | None:
+        result = await self.db.execute(
+            select(ProductContentGeneration).where(ProductContentGeneration.id == generation_id)
+        )
+        item = result.scalar_one_or_none()
+        if not item:
+            return None
+        items = list(item.result_items or [])
+        if item_index < 0 or item_index >= len(items):
+            return None
+        items[item_index] = {**items[item_index], "image_prompt": image_prompt}
+        item.result_items = items
+        item.updated_at = utc_now_naive()
+        await self.db.commit()
+        await self.db.refresh(item)
+        return item

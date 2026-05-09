@@ -3,7 +3,6 @@ import { defineStore } from 'pinia'
 import { productContentApi } from '@/apis/product_content_api'
 
 const defaultProductForm = {
-  category: 'general',
   name: '',
   material: '',
   style: '',
@@ -12,7 +11,8 @@ const defaultProductForm = {
   selling_points: [],
   target_audience: '',
   price_range: '',
-  attributes: {}
+  attributes: {},
+  image_paths: []
 }
 
 const normalizeGeneration = (data) => {
@@ -22,13 +22,14 @@ const normalizeGeneration = (data) => {
   const items = data.items || data.result_items || []
   return {
     ...data,
+    generation_id: data.generation_id ?? data.id,
+    id: data.id ?? data.generation_id,
     items,
     result_items: items,
     tone_styles: data.tone_styles || [],
     channel: data.channel || 'xiaohongshu',
     created_at: data.created_at || null,
     product_name: data.product_name || null,
-    product_category: data.product_category || null,
     prompt_name: data.prompt_name || null,
     prompt_external_id: data.prompt_external_id || null
   }
@@ -51,12 +52,18 @@ export const useProductContentStore = defineStore('productContent', () => {
   const subscription = ref(null)
   const lastGenerated = ref(null)
   const promptOptions = ref([])
+  const dashboard = ref(null)
+  const transactions = ref([])
+  const subscriptionCodes = ref([])
 
   const loadingProducts = ref(false)
   const loadingGenerations = ref(false)
   const loadingQuota = ref(false)
   const loadingSubscription = ref(false)
   const loadingPromptOptions = ref(false)
+  const loadingDashboard = ref(false)
+  const loadingTransactions = ref(false)
+  const loadingSubscriptionCodes = ref(false)
   const isGenerating = ref(false)
   const isGeneratingImage = ref(false)
 
@@ -112,6 +119,27 @@ export const useProductContentStore = defineStore('productContent', () => {
     productsTotal.value = Math.max(0, productsTotal.value - 1)
   }
 
+  async function uploadProductImage(productId, file) {
+    const data = await productContentApi.uploadProductImage(productId, file)
+    const imageUrl = data?.image_url
+    if (imageUrl) {
+      const product = products.value.find((item) => item.id === productId)
+      if (product) {
+        const paths = [...(product.image_paths || []), imageUrl]
+        product.image_paths = paths
+      }
+    }
+    return data
+  }
+
+  async function deleteProductImage(productId, imageUrl) {
+    await productContentApi.deleteProductImage(productId, imageUrl)
+    const product = products.value.find((item) => item.id === productId)
+    if (product) {
+      product.image_paths = (product.image_paths || []).filter((p) => p !== imageUrl)
+    }
+  }
+
   async function fetchGenerations(params = {}) {
     loadingGenerations.value = true
     try {
@@ -153,6 +181,65 @@ export const useProductContentStore = defineStore('productContent', () => {
     }
   }
 
+  async function fetchDashboard() {
+    loadingDashboard.value = true
+    try {
+      const data = await productContentApi.getDashboard()
+      dashboard.value = data
+      if (data?.quota) {
+        currentQuota.value = data.quota
+      }
+      if (data?.subscription) {
+        subscription.value = data.subscription
+      }
+      return data
+    } finally {
+      loadingDashboard.value = false
+    }
+  }
+
+  async function createCheckoutSession(payload) {
+    return await productContentApi.createCheckoutSession(payload)
+  }
+
+  async function createCustomerPortal(payload) {
+    return await productContentApi.createCustomerPortal(payload)
+  }
+
+  async function redeemCode(payload) {
+    const data = await productContentApi.redeemCode(payload)
+    await Promise.all([fetchSubscription(), fetchQuota(), fetchDashboard()])
+    return data
+  }
+
+  async function fetchTransactions() {
+    loadingTransactions.value = true
+    try {
+      const data = await productContentApi.getTransactions()
+      transactions.value = data.list || []
+      return data
+    } finally {
+      loadingTransactions.value = false
+    }
+  }
+
+  async function fetchSubscriptionCodes() {
+    loadingSubscriptionCodes.value = true
+    try {
+      const data = await productContentApi.getSubscriptionCodes()
+      subscriptionCodes.value = data.list || []
+      return data
+    } finally {
+      loadingSubscriptionCodes.value = false
+    }
+  }
+
+  async function createSubscriptionCode(payload) {
+    const data = await productContentApi.createSubscriptionCode(payload)
+    await fetchSubscriptionCodes()
+    return data
+  }
+
   async function generateContents(payload) {
     isGenerating.value = true
     try {
@@ -167,7 +254,6 @@ export const useProductContentStore = defineStore('productContent', () => {
             ...(payload.product || {}),
             id: normalized.product_id,
             name: normalized.product_name || payload.product?.name || products.value[index].name,
-            category: normalized.product_category || payload.product?.category || products.value[index].category,
             updated_at: normalized.created_at || products.value[index].updated_at
           }
         } else if (payload.product) {
@@ -175,7 +261,6 @@ export const useProductContentStore = defineStore('productContent', () => {
             ...payload.product,
             id: normalized.product_id,
             name: normalized.product_name || payload.product.name,
-            category: normalized.product_category || payload.product.category || 'general',
             updated_at: normalized.created_at,
             created_at: normalized.created_at
           })
@@ -204,6 +289,10 @@ export const useProductContentStore = defineStore('productContent', () => {
     }
   }
 
+  async function updateGenerationItemImagePrompt(generationId, itemIndex, imagePrompt) {
+    return await productContentApi.updateGenerationItemImagePrompt(generationId, { item_index: itemIndex, image_prompt: imagePrompt })
+  }
+
   function getDefaultProductForm() {
     return {
       ...defaultProductForm,
@@ -221,11 +310,17 @@ export const useProductContentStore = defineStore('productContent', () => {
     subscription,
     lastGenerated,
     promptOptions,
+    dashboard,
+    transactions,
+    subscriptionCodes,
     loadingProducts,
     loadingGenerations,
     loadingQuota,
     loadingSubscription,
     loadingPromptOptions,
+    loadingDashboard,
+    loadingTransactions,
+    loadingSubscriptionCodes,
     isGenerating,
     isGeneratingImage,
     hasQuota,
@@ -238,8 +333,18 @@ export const useProductContentStore = defineStore('productContent', () => {
     fetchLatestGenerationForProduct,
     fetchQuota,
     fetchSubscription,
+    fetchDashboard,
+    createCheckoutSession,
+    createCustomerPortal,
+    redeemCode,
+    fetchTransactions,
+    fetchSubscriptionCodes,
+    createSubscriptionCode,
     generateContents,
     generateImage,
+    updateGenerationItemImagePrompt,
+    uploadProductImage,
+    deleteProductImage,
     getDefaultProductForm
   }
 })

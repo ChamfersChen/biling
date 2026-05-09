@@ -71,10 +71,16 @@ redirect: '/extensions/prompts',
       redirect: '/product-content/generate',
       children: [
         {
+          path: 'dashboard',
+          name: 'ProductContentDashboard',
+          component: () => import('../views/product-content/ProductContentDashboardView.vue'),
+          meta: { keepAlive: true, requiresAuth: true }
+        },
+        {
           path: 'generate',
           name: 'ProductContentGenerate',
           component: () => import('../views/product-content/ProductContentGenerateView.vue'),
-          meta: { keepAlive: false, requiresAuth: true }
+          meta: { keepAlive: true, requiresAuth: true }
         },
         {
           path: 'history',
@@ -137,7 +143,7 @@ router.beforeEach(async (to, from, next) => {
     return
   }
 
-  const normalUserAllowedPrefixes = ['/community', '/product-content']
+  const normalUserAllowedPrefixes = ['/', '/community', '/product-content']
   const normalUserAllowed = normalUserAllowedPrefixes.some((prefix) => to.path.startsWith(prefix))
 
   // Regular users default to community

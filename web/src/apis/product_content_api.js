@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut, apiDelete } from './base'
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from './base'
 
 const BASE_URL = '/api/product-content'
 
@@ -15,7 +15,21 @@ export const productContentApi = {
   generateContents: async (payload) => unwrap(await apiPost(`${BASE_URL}/generate`, payload)),
   generateImage: async (payload) => unwrap(await apiPost(`${BASE_URL}/generate-image`, payload)),
   getQuota: async () => unwrap(await apiGet(`${BASE_URL}/quota`)),
-  getSubscription: async () => unwrap(await apiGet(`${BASE_URL}/subscription`))
+  getSubscription: async () => unwrap(await apiGet(`${BASE_URL}/subscription`)),
+  getDashboard: async () => unwrap(await apiGet(`${BASE_URL}/dashboard`)),
+  createCheckoutSession: async (payload) => unwrap(await apiPost(`${BASE_URL}/subscription/checkout`, payload)),
+  createCustomerPortal: async (payload) => unwrap(await apiPost(`${BASE_URL}/subscription/portal`, payload)),
+  redeemCode: async (payload) => unwrap(await apiPost(`${BASE_URL}/subscription/redeem`, payload)),
+  getTransactions: async () => unwrap(await apiGet(`${BASE_URL}/subscription/transactions`)),
+  getSubscriptionCodes: async () => unwrap(await apiGet(`${BASE_URL}/subscription/codes`)),
+  createSubscriptionCode: async (payload) => unwrap(await apiPost(`${BASE_URL}/subscription/codes`, payload)),
+  uploadProductImage: async (productId, file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return unwrap(await apiPost(`${BASE_URL}/products/${productId}/images`, formData, {}))
+  },
+  deleteProductImage: async (productId, imageUrl) => unwrap(await apiDelete(`${BASE_URL}/products/${productId}/images?image_url=${encodeURIComponent(imageUrl)}`)),
+  updateGenerationItemImagePrompt: async (generationId, payload) => unwrap(await apiPatch(`${BASE_URL}/generations/${generationId}/items/image-prompt`, payload))
 }
 
 export default productContentApi

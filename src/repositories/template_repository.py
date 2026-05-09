@@ -364,14 +364,13 @@ class TemplateRepository:
         item_type: str = "prompt",
         department_id: int | None = None,
     ) -> int:
-        clear_fav_stmt = (
-            update(TemplateFavorite)
+        delete_fav_stmt = (
+            delete(TemplateFavorite)
             .where(
                 TemplateFavorite.user_id == user_id,
                 TemplateFavorite.folder_path == folder_name,
                 TemplateFavorite.item_type == item_type,
             )
-            .values(folder_path=None)
         )
         stmt = delete(TemplateFavoriteFolder).where(
             TemplateFavoriteFolder.user_id == user_id,
@@ -379,12 +378,12 @@ class TemplateRepository:
             TemplateFavoriteFolder.item_type == item_type,
         )
         if department_id is None:
-            clear_fav_stmt = clear_fav_stmt.where(TemplateFavorite.department_id.is_(None))
+            delete_fav_stmt = delete_fav_stmt.where(TemplateFavorite.department_id.is_(None))
             stmt = stmt.where(TemplateFavoriteFolder.department_id.is_(None))
         else:
-            clear_fav_stmt = clear_fav_stmt.where(TemplateFavorite.department_id == department_id)
+            delete_fav_stmt = delete_fav_stmt.where(TemplateFavorite.department_id == department_id)
             stmt = stmt.where(TemplateFavoriteFolder.department_id == department_id)
-        await self.db.execute(clear_fav_stmt)
+        await self.db.execute(delete_fav_stmt)
         result = await self.db.execute(stmt)
         await self.db.commit()
         return result.rowcount or 0
