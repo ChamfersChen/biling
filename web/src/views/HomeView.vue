@@ -23,8 +23,8 @@
             class="brand-logo"
           />
           <div>
-            <p class="brand-kicker">Prompt Workspace</p>
-            <h1 class="brand-name">{{ infoStore.organization.name || infoStore.branding.name || 'Prompta' }}</h1>
+            <p class="brand-kicker">笔灵：AI让文案随心而生</p>
+            <h1 class="brand-name">{{ infoStore.organization.name || infoStore.branding.name || 'BiLing' }}</h1>
           </div>
         </div>
 
@@ -52,7 +52,7 @@
       <main class="home-main">
         <section class="hero-card">
           <div class="hero-copy">
-            <p class="eyebrow">{{ infoStore.branding.name || 'Prompta' }}</p>
+            <p class="eyebrow">{{ infoStore.branding.name || 'BiLing' }}</p>
             <h2 class="hero-title">{{ infoStore.branding.subtitle || '高效内容生成与提示词管理' }}</h2>
             <p class="hero-subtitle">围绕产品文案生成、提示词管理与社区协作的核心能力，帮助团队快速产出高质量内容。</p>
 

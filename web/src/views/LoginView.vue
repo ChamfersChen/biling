@@ -147,7 +147,7 @@ const infoStore = useInfoStore()
 
 const brandName = computed(() => {
   const org = infoStore.organization?.name?.trim() || ''
-  const brand = infoStore.branding?.name?.trim() || 'Prompta'
+  const brand = infoStore.branding?.name?.trim() || 'BiLing'
   return org || brand
 })
 

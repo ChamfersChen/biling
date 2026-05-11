@@ -12,7 +12,7 @@ export const useInfoStore = defineStore('info', () => {
 
   // 计算属性 - 组织信息
   const organization = computed(() => infoConfig.value.organization || {
-    name: "PromptAI",
+    name: "BiLing",
     logo: "/favicon.svg",
     avatar: "/avatar.jpg"
     // avatar: "/avatar.jpg"
@@ -20,9 +20,9 @@ export const useInfoStore = defineStore('info', () => {
 
   // 计算属性 - 品牌信息
   const branding = computed(() => infoConfig.value.branding || {
-    name: "PromptA",
-    title: "PromptA",
-    subtitle: "PromptA: 更智能的Prompt平台",
+    name: "BiLing",
+    title: "BiLing",
+    subtitle: "BiLing: 更智能的Prompt平台",
     description: "结合知识库与工具，提供更准确、更全面的回答"
   })
 

@@ -97,7 +97,7 @@ const router = useRouter()
 const infoStore = useInfoStore()
 
 const brandName = computed(() =>
-  infoStore.organization?.name || infoStore.branding?.name || 'Prompta'
+  infoStore.organization?.name || infoStore.branding?.name || 'BiLing'
 )
 
 const loading = ref(false)
