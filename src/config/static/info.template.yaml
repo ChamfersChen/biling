@@ -11,7 +11,7 @@ organization:
 # 项目信息
 branding:
   name: "BiLing"
-  title: "BiLing: 你的文笔工作中心"     # 系统标题
+  title: "笔灵: AI让文案随心而生"     # 系统标题
   subtitle: ""          # 副标题
 
 features:
@@ -50,4 +50,4 @@ actions:
 
 # 页脚信息
 footer:
-  copyright: "© PromptA 2026 v0.0.1"
+  copyright: "© BiLing 2026 v0.0.1"

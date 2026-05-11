@@ -23,7 +23,7 @@
             class="brand-logo"
           />
           <div>
-            <p class="brand-kicker">笔灵：AI让文案随心而生</p>
+            <p class="brand-kicker">笔灵: AI让文案随心而生</p>
             <h1 class="brand-name">{{ infoStore.organization.name || infoStore.branding.name || 'BiLing' }}</h1>
           </div>
         </div>

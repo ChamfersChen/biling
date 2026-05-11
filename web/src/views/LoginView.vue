@@ -25,7 +25,7 @@
           class="brand-lockup__logo"
         />
         <div>
-          <p class="brand-lockup__kicker">Prompt Workspace</p>
+          <p class="brand-lockup__kicker">笔灵: AI让文案随心而生</p>
           <h1 class="brand-lockup__name">{{ brandName }}</h1>
         </div>
       </div>
