@@ -534,7 +534,7 @@ class ProductContentService:
         count: int,
         prompt_external_id: str | None,
     ) -> tuple[str, dict[str, str | None]]:
-        if prompt_external_id == '__builtin__':
+        if not prompt_external_id or prompt_external_id == '__builtin__':
             prompt = build_product_content_prompt(product=product, channel=channel, styles=styles, count=count)
             return prompt, {"external_id": None, "name": "系统内置提示词"}
 

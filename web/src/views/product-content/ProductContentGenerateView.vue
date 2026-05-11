@@ -198,7 +198,7 @@
       </div>
     </section>
 
-    <a-drawer v-model:open="showProductsDrawer" title="已保存产品" placement="right" :width="480">
+    <a-drawer v-model:open="showProductsDrawer" title="已保存产品" placement="right" :width="drawerWidth">
       <div class="drawer-toolbar">
         <a-input v-model:value="productKeyword" size="large" placeholder="搜索产品名称、类目" />
         <a-space>
@@ -226,7 +226,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { Copy, Image, PackageSearch, Plus, RefreshCw, Sparkles } from 'lucide-vue-next'
@@ -256,6 +256,7 @@ const hasFormChanges = ref(false)
 const uploadingImage = ref(false)
 const editingImagePromptIndex = ref(null)
 const editingImagePromptValue = ref('')
+const drawerWidth = ref(Math.min(480, window.innerWidth - 48))
 
 const selectedPromptExternalId = ref(undefined)
 const requiredPromptVariables = ['product_payload', 'channel', 'styles_payload', 'count']
@@ -417,6 +418,7 @@ const handleUseProduct = (product) => {
   activeProductPreviewId.value = product.id
   loadProductToForm(product)
   void loadSelectedProductResult(product.id)
+  showProductsDrawer.value = false
 }
 
 const handleCreateNewProduct = () => { resetProductForm(); activeProductPreviewId.value = null; showProductsDrawer.value = false }
@@ -641,7 +643,16 @@ onMounted(async () => {
     handleSelectProduct(queryProductId)
   }
   activeProductPreviewId.value = selectedProductId.value || productContentStore.products[0]?.id || null
+  window.addEventListener('resize', handleResize)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+})
+
+const handleResize = () => {
+  drawerWidth.value = Math.min(480, window.innerWidth - 48)
+}
 
 watch(filteredProducts, (nextList) => {
   if (!nextList.length) { activeProductPreviewId.value = null; return }

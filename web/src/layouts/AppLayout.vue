@@ -3,8 +3,9 @@ import { ref, reactive, onMounted, computed, provide } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import {
   GithubOutlined,
+  MenuOutlined,
 } from '@ant-design/icons-vue'
-import { BarChart3, BookText, Package, Users } from 'lucide-vue-next'
+import { BarChart3, BookText, Package, Users, X } from 'lucide-vue-next'
 
 import { useConfigStore } from '@/stores/config'
 // import { useDatabaseStore } from '@/stores/database'
@@ -43,6 +44,15 @@ const showDebugModal = ref(false)
 
 // Add state for settings modal
 const showSettingsModal = ref(false)
+const mobileSidebarOpen = ref(false)
+
+const toggleMobileSidebar = () => {
+  mobileSidebarOpen.value = !mobileSidebarOpen.value
+}
+
+const closeMobileSidebar = () => {
+  mobileSidebarOpen.value = false
+}
 
 // Provide settings modal methods to child components
 const openSettingsModal = () => {
@@ -103,11 +113,31 @@ provide('settingsModal', {
 </script>
 
 <template>
-  <div class="app-layout" :class="{ 'use-top-bar': layoutSettings.useTopBar }">
-    <!-- 侧边栏（普通用户和管理员统一） -->
-    <div class="header" :class="{ 'top-bar': layoutSettings.useTopBar }">
+  <div class="app-layout" :class="{ 'use-top-bar': layoutSettings.useTopBar, 'sidebar-open': mobileSidebarOpen }">
+    <!-- Mobile header -->
+    <div class="mobile-header">
+      <button class="mobile-hamburger" @click="toggleMobileSidebar" type="button">
+        <MenuOutlined v-if="!mobileSidebarOpen" />
+        <X v-else :size="20" />
+      </button>
+      <router-link to="/" class="mobile-logo" @click="closeMobileSidebar">
+        <img :src="infoStore.organization.avatar" />
+      </router-link>
+      <div class="mobile-header-right">
+        <UserInfoComponent />
+      </div>
+    </div>
+
+    <!-- Mobile backdrop -->
+    <div v-if="mobileSidebarOpen" class="mobile-backdrop" @click="closeMobileSidebar" />
+
+    <!-- 侧边栏 -->
+    <div class="header" :class="{ 'top-bar': layoutSettings.useTopBar, 'mobile-sidebar': true }">
+      <button class="sidebar-close" @click="closeMobileSidebar" type="button">
+        <X :size="18" />
+      </button>
       <div class="logo circle">
-        <router-link to="/">
+        <router-link to="/" @click="closeMobileSidebar">
           <img :src="infoStore.organization.avatar" />
         </router-link>
       </div>
@@ -119,6 +149,7 @@ provide('settingsModal', {
           v-show="!item.hidden"
           class="nav-item"
           active-class="active"
+          @click="closeMobileSidebar"
         >
           <a-tooltip placement="right">
             <template #title>{{ item.name }}</template>
@@ -135,6 +166,7 @@ provide('settingsModal', {
         to="/community"
         class="nav-item"
         :class="{ active: route.path.startsWith('/community') }"
+        @click="closeMobileSidebar"
       >
         <a-tooltip placement="right">
           <template #title>社区</template>
@@ -475,6 +507,163 @@ div.header,
         }
       }
     }
+  }
+}
+
+/* ============================================================
+   Mobile responsive
+   ============================================================ */
+
+.mobile-header {
+  display: none;
+}
+
+.mobile-backdrop {
+  display: none;
+}
+
+.sidebar-close {
+  display: none;
+}
+
+@media (max-width: 820px) {
+  .mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 48px;
+    padding: 0 12px;
+    background: var(--main-0);
+    border-bottom: 1px solid var(--gray-100);
+    flex-shrink: 0;
+    z-index: 100;
+  }
+
+  .mobile-hamburger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 0;
+    background: transparent;
+    color: var(--gray-800);
+    cursor: pointer;
+    font-size: 18px;
+  }
+
+  .mobile-logo {
+    height: 28px;
+  }
+
+  .mobile-logo img {
+    height: 28px;
+    border-radius: 4px;
+  }
+
+  .mobile-header-right {
+    display: flex;
+    align-items: center;
+  }
+
+  .app-layout {
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  #app-router-view {
+    height: calc(100vh - 48px);
+  }
+
+  .header {
+    position: fixed;
+    top: 0;
+    left: -260px;
+    width: 240px;
+    height: 100vh;
+    z-index: 1000;
+    transition: left 0.25s ease;
+    flex: none;
+  }
+
+  .header.mobile-sidebar {
+    left: -260px;
+  }
+
+  .sidebar-open .header.mobile-sidebar {
+    left: 0;
+  }
+
+  .sidebar-open .mobile-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 999;
+  }
+
+  .sidebar-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 40px;
+    border: 0;
+    background: transparent;
+    color: var(--gray-600);
+    cursor: pointer;
+  }
+
+  .sidebar-close:hover {
+    color: var(--main-color);
+  }
+
+  .logo {
+    margin: 4px 0 12px 0;
+  }
+
+  .nav {
+    gap: 8px;
+  }
+
+  .nav-item {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+@media (max-width: 600px) {
+  #app-router-view :deep(.ant-drawer) {
+    width: 100% !important;
+  }
+
+  #app-router-view :deep(.ant-modal) {
+    width: calc(100vw - 32px) !important;
+    max-width: 100vw !important;
+  }
+
+  #app-router-view :deep(.ant-modal-content) {
+    padding: 16px;
+  }
+
+  #app-router-view :deep(.page) {
+    padding: 12px !important;
+  }
+
+  #app-router-view :deep(.dashboard-page) {
+    padding: 12px !important;
+  }
+
+  #app-router-view :deep(.sub-page) {
+    padding: 12px !important;
+  }
+
+  #app-router-view :deep(.history-page) {
+    padding: 12px !important;
+  }
+
+  #app-router-view :deep(.community-view) {
+    padding: 12px !important;
   }
 }
 </style>
